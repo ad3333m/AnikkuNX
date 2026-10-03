@@ -61,51 +61,6 @@ void showFullMemoryHelp() {
     d->open();
 }
 
-/** Orange crescent mark in front of the wordmark. */
-class LogoMark : public brls::View {
-  public:
-    LogoMark() {
-        setWidth(34);
-        setHeight(34);
-    }
-    void draw(NVGcontext* vg, float x, float y, float w, float h, brls::Style, brls::FrameContext*) override {
-        float cx = x + w / 2, cy = y + h / 2;
-        nvgBeginPath(vg);
-        nvgCircle(vg, cx, cy, 15);
-        nvgFillColor(vg, cr::orange());
-        nvgFill(vg);
-        nvgBeginPath(vg);
-        nvgCircle(vg, cx + 4.5f, cy - 2.5f, 8.5f);
-        nvgFillColor(vg, cr::bar());
-        nvgFill(vg);
-        nvgBeginPath(vg);
-        nvgCircle(vg, cx + 6.5f, cy - 4.5f, 3.5f);
-        nvgFillColor(vg, cr::orange());
-        nvgFill(vg);
-    }
-};
-
-/** Solid play triangle for the "Start watching" button. */
-class PlayGlyph : public brls::View {
-  public:
-    explicit PlayGlyph(NVGcolor c) : color(c) {
-        setWidth(15);
-        setHeight(18);
-    }
-    void draw(NVGcontext* vg, float x, float y, float w, float h, brls::Style, brls::FrameContext*) override {
-        nvgBeginPath(vg);
-        nvgMoveTo(vg, x + 1, y + 1);
-        nvgLineTo(vg, x + w - 1, y + h / 2);
-        nvgLineTo(vg, x + 1, y + h - 1);
-        nvgClosePath(vg);
-        nvgFillColor(vg, color);
-        nvgFill(vg);
-    }
-
-  private:
-    NVGcolor color;
-};
-
 std::string upper(std::string s) {
     for (auto& c : s) c = (char)toupper((unsigned char)c);
     return s;
@@ -159,12 +114,7 @@ void MainActivity::onContentAvailable() {
 
 ScreenActivity::ScreenActivity(std::string t, std::function<brls::View*()> m) : title(std::move(t)), make(std::move(m)) {}
 
-brls::View* ScreenActivity::createContentView() {
-    brls::View* v = make();
-    v->getAppletFrameItem()->title = title;
-    v->getAppletFrameItem()->iconPath = BRLS_ASSET("icon/icon_96.png");
-    return new brls::AppletFrame(v);
-}
+brls::View* ScreenActivity::createContentView() { return cr::page(title, make()); }
 
 // ============================================================================ TabBase
 
@@ -201,8 +151,9 @@ HomeView::HomeView() {
     content->setPaddingBottom(20);
     content->addView(buildHero());
 
-    continueRow = new cr::PosterRow("Continue Watching");
+    continueRow = new cr::PosterRow("Continue Watching", "Press + for options");
     continueRow->onSelect = openAnime;
+    continueRow->onOptions = [this](const GridItem& it) { continueOptions(it); };
     continueRow->progressOf = [](const GridItem& it) -> float {
         if (it.extra.value("watched", false)) return 1.0f;
         double d = it.extra.value("duration", 0.0), p = it.extra.value("position", 0.0);
@@ -226,7 +177,7 @@ HomeView::HomeView() {
     otherRows->setAlignItems(brls::AlignItems::STRETCH);
     content->addView(otherRows);
 
-    auto* foot = cr::label("AnikkuNX v" + updater::currentVersion() + "    \xC2\xB7    Press + to exit", 14, cr::dim());
+    auto* foot = cr::label("AnikkuNX v" + updater::currentVersion(), 14, cr::dim());
     foot->setMargins(16, 60, 10, 60);
     content->addView(foot);
 
@@ -236,11 +187,6 @@ HomeView::HomeView() {
     scroll->setScrollingIndicatorVisible(false);
     scroll->setContentView(content);
     addView(scroll);
-
-    registerAction("Exit", brls::BUTTON_START, [](brls::View*) {
-        brls::Application::quit();
-        return true;
-    });
 
     loadContinueWatching();
     refreshLibrary();
@@ -271,13 +217,8 @@ brls::Box* HomeView::buildTopBar() {
     bar->setAlignItems(brls::AlignItems::CENTER);
     bar->setPadding(0, 24, 0, 36);
 
-    auto* logo = new brls::Box(brls::Axis::ROW);
-    logo->setAlignItems(brls::AlignItems::CENTER);
+    auto* logo = cr::logo();
     logo->setMarginRight(26);
-    logo->addView(new LogoMark());
-    auto* word = cr::label("AnikkuNX", 24, cr::orange(), true);
-    word->setMarginLeft(8);
-    logo->addView(word);
     bar->addView(logo);
 
     bar->addView(new cr::NavItem("Browse", [] { openScreen("Browse", [] { return new SourcesTab(); }); }));
@@ -344,7 +285,7 @@ brls::Box* HomeView::buildHero() {
     watchBtn->setHideHighlightBackground(true);
     watchBtn->setHighlightCornerRadius(2);
     watchBtn->setHighlightPadding(4);
-    watchBtn->addView(new PlayGlyph(nvgRGB(0, 0, 0)));
+    watchBtn->addView(new cr::PlayGlyph(nvgRGB(0, 0, 0)));
     watchLabel = cr::label("START WATCHING", 16, nvgRGB(0, 0, 0), true);
     watchLabel->setMarginLeft(10);
     watchBtn->addView(watchLabel);
@@ -499,6 +440,29 @@ void HomeView::rebuildSourceRows() {
     }
 }
 
+void HomeView::continueOptions(const GridItem& it) {
+    std::vector<std::string> labels = {"Info", "Remove from Watch History"};
+    // act in the dismiss callback: the plain one fires before the menu has closed
+    auto* dd = new brls::Dropdown(cr::ellipsize(it.title, 60), labels, [](int) {}, 0, [this, it](int sel) {
+        if (sel == 0) {
+            openAnime(it);
+        } else if (sel == 1) {
+            std::string sid = it.sourceId, url = it.url;
+            runAsync<bool>(
+                alive,
+                [sid, url] {
+                    api::removeFromHistory(sid, url);
+                    return true;
+                },
+                [this](bool) {
+                    brls::Application::notify("Removed from Watch History");
+                    loadContinueWatching();
+                });
+        }
+    });
+    brls::Application::pushActivity(new brls::Activity(dd));
+}
+
 void HomeView::loadContinueWatching() {
     runAsync<json>(
         alive, [] { return api::history(); },
@@ -510,6 +474,7 @@ void HomeView::loadContinueWatching() {
                 items.push_back({h.value("sourceId", ""), h.value("animeUrl", ""), h.value("title", ""), sub,
                                  h.value("thumbnail", ""), h});
             }
+            if (items.empty() && continueRow->isChildFocused()) brls::Application::giveFocus(watchBtn);
             if (!items.empty()) continueRow->setItems(items);
             continueRow->setVisibility(items.empty() ? brls::Visibility::GONE : brls::Visibility::VISIBLE);
         },
@@ -907,48 +872,69 @@ void SearchTab::search(const std::string& q) {
 
 // ============================================================================ Impostazioni
 
+static brls::Box* section(const std::string& title, const std::string& subtitle = "") {
+    auto* box = new brls::Box(brls::Axis::COLUMN);
+    box->setMargins(34, 0, 8, 0);
+    auto* row = new brls::Box(brls::Axis::ROW);
+    row->setAlignItems(brls::AlignItems::CENTER);
+    auto* accent = new brls::Box(brls::Axis::ROW);
+    accent->setWidth(4);
+    accent->setHeight(22);
+    accent->setBackgroundColor(cr::orange());
+    accent->setMarginRight(12);
+    row->addView(accent);
+    row->addView(cr::label(title, 22, cr::text(), true));
+    box->addView(row);
+    if (!subtitle.empty()) {
+        auto* s = cr::label(subtitle, 15, cr::muted());
+        s->setMarginTop(6);
+        s->setMarginLeft(16);
+        box->addView(s);
+    }
+    return box;
+}
+
+static std::string activeSourcesText() {
+    size_t n = api::sources().size();
+    return n == 1 ? "1 source active" : std::to_string(n) + " sources active";
+}
+
 SettingsTab::SettingsTab() {
     auto* box = new brls::Box(brls::Axis::COLUMN);
-    box->setPadding(20, 40, 30, 40);
+    box->setPadding(28, 140, 40, 140);
+    box->setAlignItems(brls::AlignItems::STRETCH);
     auto& cfg = Config::instance();
 
-    box->addView(header(tr("Fonti")));
-    auto* pick = new brls::DetailCell();
-    pick->setText(tr("Scegli le fonti attive"));
-    pick->setDetailText(tr("{} attive", std::to_string(api::sources().size())));
-    pick->registerClickAction([pick](brls::View*) {
-        // dopo la conferma aggiorna subito il numero di fonti attive
-        brls::Application::pushActivity(new SourcePickerActivity(false, [pick] {
-            pick->setDetailText(tr("{} attive", std::to_string(api::sources().size())));
-        }));
-        return true;
+    // ---- sources card
+    auto* card = new brls::Box(brls::Axis::ROW);
+    card->setBackgroundColor(cr::bar());
+    card->setPadding(24, 28, 24, 28);
+    card->setAlignItems(brls::AlignItems::CENTER);
+    card->setLineLeft(4);
+    card->setLineColor(cr::orange());
+    auto* cardText = new brls::Box(brls::Axis::COLUMN);
+    cardText->setGrow(1);
+    cardText->addView(cr::label("Anime Sources", 26, cr::text(), true));
+    auto* count = cr::label(activeSourcesText(), 16, cr::orange(), true);
+    count->setMarginTop(6);
+    cardText->addView(count);
+    auto* explain = cr::label(cr::wrap("Choose which sites AnikkuNX streams from. Your home screen rows, search and "
+                                       "Browse only use the sources you turn on.",
+                                       15, 560),
+                              15, cr::muted());
+    explain->setMarginTop(8);
+    cardText->addView(explain);
+    card->addView(cardText);
+    auto* choose = new cr::CtaButton("CHOOSE SOURCES", true, false, [count] {
+        brls::Application::pushActivity(
+            new SourcePickerActivity(false, [count] { count->setText(activeSourcesText()); }));
     });
-    box->addView(pick);
+    choose->setMarginLeft(24);
+    card->addView(choose);
+    box->addView(card);
 
-    box->addView(header(tr("Indirizzi dei siti attivi (cambiali se una fonte smette di funzionare)")));
-    for (auto& s : src::all()) {
-        if (!cfg.isSourceEnabled(s->id())) continue;
-        auto* cell = new brls::InputCell();
-        std::string id = s->id();
-        std::string current = cfg.domains.count(id) ? cfg.domains[id] : "";
-        cell->init(
-            s->name(), current.empty() ? s->defaultBaseUrl() : current,
-            [id, cell](std::string text) {
-                auto s = src::byId(id);
-                if (text.empty() || (s && text == s->defaultBaseUrl()))
-                    Config::instance().domains.erase(id);
-                else
-                    Config::instance().domains[id] = text;
-                Config::instance().save();
-                Config::instance().applyDomains();
-                if (s) cell->setValue(s->baseUrl());
-            },
-            "", tr("Es. https://www.animeworld.ac (lascia vuoto per il predefinito)"), 80);
-        box->addView(cell);
-    }
-
-    box->addView(header(tr("Riproduzione")));
-
+    // ---- playback
+    box->addView(section("Playback"));
     auto* hw = new brls::BooleanCell();
     hw->init(tr("Decodifica hardware"), cfg.hardwareDecoding, [](bool on) {
         Config::instance().hardwareDecoding = on;
@@ -978,13 +964,6 @@ SettingsTab::SettingsTab() {
         box->addView(subLang);
     }
 
-    auto* proxy = new brls::BooleanCell();
-    proxy->init(tr("Ripara gli stream con segmenti camuffati (proxy locale)"), cfg.hlsProxy, [](bool on) {
-        Config::instance().hlsProxy = on;
-        Config::instance().save();
-    });
-    box->addView(proxy);
-
     auto* skip = new brls::BooleanCell();
     skip->init(tr("Salta automaticamente la sigla (se la fonte la indica)"), cfg.autoSkipOpening, [](bool on) {
         Config::instance().autoSkipOpening = on;
@@ -992,7 +971,67 @@ SettingsTab::SettingsTab() {
     });
     box->addView(skip);
 
-    box->addView(header(tr("Informazioni")));
+    auto* proxy = new brls::BooleanCell();
+    proxy->init(tr("Ripara gli stream con segmenti camuffati (proxy locale)"), cfg.hlsProxy, [](bool on) {
+        Config::instance().hlsProxy = on;
+        Config::instance().save();
+    });
+    box->addView(proxy);
+
+    // ---- library & updates
+    box->addView(section("Library & Updates"));
+    auto* newEps = new brls::BooleanCell();
+    newEps->init(tr("Controlla i nuovi episodi della libreria all'avvio"), cfg.checkNewEpisodes, [](bool on) {
+        Config::instance().checkNewEpisodes = on;
+        Config::instance().save();
+    });
+    box->addView(newEps);
+
+    auto* autoUpd = new brls::BooleanCell();
+    autoUpd->init(tr("Controlla aggiornamenti all'avvio"), cfg.checkUpdates, [](bool on) {
+        Config::instance().checkUpdates = on;
+        Config::instance().save();
+    });
+    box->addView(autoUpd);
+
+    auto* upd = new brls::DetailCell();
+    upd->setText(tr("Controlla aggiornamenti"));
+    upd->setDetailText("github.com/" UPDATE_REPO_DISPLAY);
+    upd->registerClickAction([](brls::View*) {
+        // (debug interno: con L+R premuti si apre l'invio del .nro dal PC)
+        if (debugComboHeld())
+            brls::Application::pushActivity(new DebugUploadActivity());
+        else
+            checkForUpdates(true);
+        return true;
+    });
+    box->addView(upd);
+
+    // ---- site addresses
+    box->addView(section("Site Addresses", "Change an address if one of your sources stops working."));
+    for (auto& s : src::all()) {
+        if (!cfg.isSourceEnabled(s->id())) continue;
+        auto* cell = new brls::InputCell();
+        std::string id = s->id();
+        std::string current = cfg.domains.count(id) ? cfg.domains[id] : "";
+        cell->init(
+            s->name(), current.empty() ? s->defaultBaseUrl() : current,
+            [id, cell](std::string text) {
+                auto s = src::byId(id);
+                if (text.empty() || (s && text == s->defaultBaseUrl()))
+                    Config::instance().domains.erase(id);
+                else
+                    Config::instance().domains[id] = text;
+                Config::instance().save();
+                Config::instance().applyDomains();
+                if (s) cell->setValue(s->baseUrl());
+            },
+            "", tr("Es. https://www.animeworld.ac (lascia vuoto per il predefinito)"), 80);
+        box->addView(cell);
+    }
+
+    // ---- about
+    box->addView(section("About"));
     auto* fwd = new brls::DetailCell();
     fwd->setText(tr("Icona nella schermata Home (forwarder)"));
     fwd->setDetailText("Sphaira");
@@ -1014,43 +1053,14 @@ SettingsTab::SettingsTab() {
     ver->setDetailText("AnikkuNX v" + updater::currentVersion());
     box->addView(ver);
 
-    auto* upd = new brls::DetailCell();
-    upd->setText(tr("Controlla aggiornamenti"));
-    upd->setDetailText("github.com/" UPDATE_REPO_DISPLAY);
-    upd->registerClickAction([](brls::View*) {
-        // (debug interno: con L+R premuti si apre l'invio del .nro dal PC)
-        if (debugComboHeld())
-            brls::Application::pushActivity(new DebugUploadActivity());
-        else
-            checkForUpdates(true);
-        return true;
-    });
-    box->addView(upd);
-
-    auto* autoUpd = new brls::BooleanCell();
-    autoUpd->init(tr("Controlla aggiornamenti all'avvio"), cfg.checkUpdates, [](bool on) {
-        Config::instance().checkUpdates = on;
-        Config::instance().save();
-    });
-    box->addView(autoUpd);
-
-    auto* newEps = new brls::BooleanCell();
-    newEps->init(tr("Controlla i nuovi episodi della libreria all'avvio"), cfg.checkNewEpisodes, [](bool on) {
-        Config::instance().checkNewEpisodes = on;
-        Config::instance().save();
-    });
-    box->addView(newEps);
-
-    auto* about = new brls::Label();
-    about->setText(tr(
-        "App autonoma per Nintendo Switch con fonti italiane, inglesi e multilingua "
-        "(porting delle estensioni di Anikku/Aniyomi).\n"
-        "Libreria e progressi sono salvati in sdmc:/switch/AnikkuNX. Avvia l'app tenendo premuto R su un gioco "
-        "per avere piu' memoria."));
-    about->setFontSize(15);
-    about->setTextColor(nvgRGB(150, 150, 160));
+    auto* about = cr::label(cr::wrap("Library and progress are saved in sdmc:/switch/AnikkuNX. For the most memory, "
+                                     "launch the app by holding R while starting a game.",
+                                     15, 990),
+                            15, cr::dim());
     about->setMarginTop(24);
     box->addView(about);
 
-    this->addView(scrollOf(box));
+    auto* sf = scrollOf(box);
+    sf->setScrollingIndicatorVisible(false);
+    this->addView(sf);
 }

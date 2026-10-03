@@ -7,6 +7,7 @@
 
 #include "config.hpp"
 #include "sources/source.hpp"
+#include "view/crunchy.hpp"
 
 static std::string langName(const std::string& l) { return i18n::languageName(l); }
 
@@ -90,20 +91,12 @@ brls::View* SourcePickerActivity::createContentView() {
     root->addView(scroll);
     rebuild();
 
-    root->getAppletFrameItem()->title = tr("Scegli le fonti");
-    auto* frame = new brls::AppletFrame(root);
-    frame->registerAction(tr("Conferma"), brls::BUTTON_START, [this](brls::View*) {
+    // B asks before leaving with unsaved changes
+    auto* frame = cr::page("Choose Sources", root, [this] { askBeforeLeaving(); });
+    frame->registerAction("Confirm", brls::BUTTON_START, [this](brls::View*) {
         confirm();
         return true;
     });
-    // sostituisce il "Indietro" predefinito: niente uscite con modifiche non salvate
-    frame->registerAction(
-        tr("Indietro"), brls::BUTTON_B,
-        [this](brls::View*) {
-            askBeforeLeaving();
-            return true;
-        },
-        false, false, brls::SOUND_BACK);
     return frame;
 }
 

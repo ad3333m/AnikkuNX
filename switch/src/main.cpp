@@ -68,7 +68,19 @@ int main(int argc, char* argv[]) {
 
     // Theme: Crunchyroll-style black background with orange accents
     auto& theme = brls::Theme::getDarkTheme();
+    theme.addColor("brls/clear", nvgRGB(0, 0, 0));
     theme.addColor("brls/background", nvgRGB(0, 0, 0));
+    theme.addColor("brls/highlight/background", nvgRGB(28, 29, 34));
+    theme.addColor("brls/click_pulse", nvgRGBA(244, 117, 33, 38));
+    theme.addColor("brls/sidebar/background", nvgRGB(20, 21, 25));
+    theme.addColor("brls/sidebar/separator", nvgRGB(42, 43, 50));
+    theme.addColor("brls/header/border", nvgRGB(42, 43, 50));
+    theme.addColor("brls/header/rectangle", nvgRGB(244, 117, 33));
+    theme.addColor("brls/applet_frame/separator", nvgRGB(42, 43, 50));
+    theme.addColor("brls/list/listItem_value_color", nvgRGB(244, 117, 33));
+    theme.addColor("brls/button/default_enabled_background", nvgRGB(35, 37, 43));
+    theme.addColor("brls/button/enabled_border_color", nvgRGB(244, 117, 33));
+    theme.addColor("brls/button/highlight_enabled_text", nvgRGB(244, 117, 33));
     theme.addColor("brls/accent", nvgRGB(244, 117, 33));
     theme.addColor("brls/highlight/color1", nvgRGB(244, 117, 33));
     theme.addColor("brls/highlight/color2", nvgRGB(255, 190, 130));

@@ -24,29 +24,50 @@ std::string ellipsize(const std::string& s, size_t maxChars) {
     return out + "\xE2\x80\xA6";
 }
 
-std::string wrap(const std::string& s, float fontSize, float width) {
+std::string wrap(const std::string& s, float fontSize, float width, int maxLines) {
     NVGcontext* vg = brls::Application::getNVGContext();
     if (!vg || s.empty()) return s;
     nvgSave(vg);
     nvgFontFaceId(vg, brls::Application::getDefaultFont());
     nvgFontSize(vg, fontSize);
     nvgTextLetterSpacing(vg, 0);
-    std::string out;
+    std::vector<std::string> lines;
     const char* p = s.c_str();
     const char* end = p + s.size();
     NVGtextRow rows[8];
     int n;
+    bool truncated = false;
     while (p < end && (n = nvgTextBreakLines(vg, p, end, width, rows, 8)) > 0) {
         for (int i = 0; i < n; i++) {
             std::string line(rows[i].start, rows[i].end);
             size_t a = line.find_first_not_of(' ');
             if (a == std::string::npos) continue;
-            if (!out.empty()) out += "\n";
-            out += line.substr(a);
+            if (maxLines > 0 && (int)lines.size() == maxLines) {
+                truncated = true;
+                break;
+            }
+            lines.push_back(line.substr(a));
         }
+        if (truncated) break;
         p = rows[n - 1].next;
     }
+    if (truncated && !lines.empty()) {
+        // shorten the last line until it fits with an ellipsis
+        std::string& last = lines.back();
+        float b[4];
+        while (!last.empty()) {
+            std::string t = last + "\xE2\x80\xA6";
+            if (nvgTextBounds(vg, 0, 0, t.c_str(), nullptr, b) <= width) break;
+            last.pop_back();
+            while (!last.empty() && ((unsigned char)last.back() & 0xC0) == 0x80) last.pop_back();
+            if (!last.empty() && ((unsigned char)last.back() & 0xC0) == 0xC0) last.pop_back();
+        }
+        while (!last.empty() && last.back() == ' ') last.pop_back();
+        last += "\xE2\x80\xA6";
+    }
     nvgRestore(vg);
+    std::string out;
+    for (auto& l : lines) out += (out.empty() ? "" : "\n") + l;
     return out;
 }
 
@@ -81,6 +102,139 @@ void IconView::draw(NVGcontext* vg, float x, float y, float width, float height,
     nvgText(vg, x + width / 2, y + height / 2, glyph.c_str(), nullptr);
     nvgFontFaceId(vg, brls::Application::getDefaultFont());
 }
+
+// ---------------------------------------------------------------------------- chrome
+
+LogoMark::LogoMark() {
+    setWidth(34);
+    setHeight(34);
+}
+
+void LogoMark::draw(NVGcontext* vg, float x, float y, float w, float h, brls::Style, brls::FrameContext*) {
+    float cx = x + w / 2, cy = y + h / 2;
+    nvgBeginPath(vg);
+    nvgCircle(vg, cx, cy, 15);
+    nvgFillColor(vg, orange());
+    nvgFill(vg);
+    nvgBeginPath(vg);
+    nvgCircle(vg, cx + 4.5f, cy - 2.5f, 8.5f);
+    nvgFillColor(vg, bar());
+    nvgFill(vg);
+    nvgBeginPath(vg);
+    nvgCircle(vg, cx + 6.5f, cy - 4.5f, 3.5f);
+    nvgFillColor(vg, orange());
+    nvgFill(vg);
+}
+
+PlayGlyph::PlayGlyph(NVGcolor c) : color(c) {
+    setWidth(15);
+    setHeight(18);
+}
+
+void PlayGlyph::draw(NVGcontext* vg, float x, float y, float w, float h, brls::Style, brls::FrameContext*) {
+    nvgBeginPath(vg);
+    nvgMoveTo(vg, x + 1, y + 1);
+    nvgLineTo(vg, x + w - 1, y + h / 2);
+    nvgLineTo(vg, x + 1, y + h - 1);
+    nvgClosePath(vg);
+    nvgFillColor(vg, color);
+    nvgFill(vg);
+}
+
+brls::Box* logo() {
+    auto* box = new brls::Box(brls::Axis::ROW);
+    box->setAlignItems(brls::AlignItems::CENTER);
+    box->addView(new LogoMark());
+    auto* word = label("AnikkuNX", 24, orange(), true);
+    word->setMarginLeft(8);
+    box->addView(word);
+    return box;
+}
+
+namespace {
+
+/** Page root: focus starts in the content, not on the back button. */
+class Page : public brls::Box {
+  public:
+    explicit Page(brls::View* c) : brls::Box(brls::Axis::COLUMN), content(c) {}
+    brls::View* getDefaultFocus() override {
+        brls::View* f = content->getDefaultFocus();
+        return f ? f : brls::Box::getDefaultFocus();
+    }
+
+  private:
+    brls::View* content;
+};
+
+}  // namespace
+
+brls::Box* page(const std::string& title, brls::View* content, std::function<void()> onBack) {
+    std::function<void()> back = onBack ? onBack : [] { brls::Application::popActivity(); };
+    auto* root = new Page(content);
+    root->setGrow(1);
+    root->setBackgroundColor(nvgRGB(0, 0, 0));
+
+    auto* topBar = new brls::Box(brls::Axis::ROW);
+    topBar->setHeight(64);
+    topBar->setBackgroundColor(bar());
+    topBar->setAlignItems(brls::AlignItems::CENTER);
+    topBar->setPadding(0, 36, 0, 12);
+    topBar->addView(new NavIcon(ICON_BACK, back));
+    auto* lg = logo();
+    lg->setMarginLeft(10);
+    topBar->addView(lg);
+    if (!title.empty()) {
+        auto* sep = new brls::Box(brls::Axis::ROW);
+        sep->setWidth(2);
+        sep->setHeight(28);
+        sep->setMargins(0, 22, 0, 22);
+        sep->setBackgroundColor(nvgRGB(70, 70, 78));
+        topBar->addView(sep);
+        topBar->addView(label(title, 22, text(), true));
+    }
+    root->addView(topBar);
+
+    content->setGrow(1);
+    root->addView(content);
+    root->registerAction(
+        "Back", brls::BUTTON_B,
+        [back](brls::View*) {
+            back();
+            return true;
+        },
+        false, false, brls::SOUND_BACK);
+    return root;
+}
+
+CtaButton::CtaButton(const std::string& text, bool filled, bool playGlyph, std::function<void()> onClick)
+    : brls::Box(brls::Axis::ROW) {
+    setFocusable(true);
+    setHeight(46);
+    setPadding(0, 22, 0, playGlyph ? 18 : 22);
+    setAlignItems(brls::AlignItems::CENTER);
+    setJustifyContent(brls::JustifyContent::CENTER);
+    setHideHighlightBackground(true);
+    setHighlightCornerRadius(2);
+    setHighlightPadding(4);
+    NVGcolor fg = filled ? nvgRGB(0, 0, 0) : orange();
+    if (filled) {
+        setBackgroundColor(orange());
+    } else {
+        setBorderColor(orange());
+        setBorderThickness(2);
+    }
+    if (playGlyph) addView(new PlayGlyph(fg));
+    lbl = label(text, 16, fg, true);
+    if (playGlyph) lbl->setMarginLeft(10);
+    addView(lbl);
+    registerClickAction([onClick](brls::View*) {
+        onClick();
+        return true;
+    });
+    addGestureRecognizer(new brls::TapGestureRecognizer(this));
+}
+
+void CtaButton::setText(const std::string& text) { lbl->setText(text); }
 
 // ---------------------------------------------------------------------------- top bar
 
@@ -286,6 +440,11 @@ void PosterRow::setItems(const std::vector<GridItem>& items) {
             if (onSelect) onSelect(card->item);
             return true;
         });
+        if (onOptions)
+            card->registerAction("Options", brls::BUTTON_START, [this, card](brls::View*) {
+                if (onOptions) onOptions(card->item);
+                return true;
+            });
         strip->addView(card);
         if (!first) first = card;
     }
@@ -321,11 +480,11 @@ void HeroBackdrop::draw(NVGcontext* vg, float x, float y, float w, float h, brls
     float iw = getOriginalImageWidth(), ih = getOriginalImageHeight();
     if (tex && iw > 0 && ih > 0) {
         // zoom the cover to fill, biased towards the top where faces usually are
-        float s = std::max(w / iw, h / ih) * 1.05f;
+        float s = std::max(w / iw, h / ih) * (blur ? 1.05f : 1.0f);
         float dw = iw * s, dh = ih * s;
-        float ox = x + (w - dw) / 2, oy = y + (h - dh) * 0.22f;
+        float ox = x + (w - dw) / 2, oy = y + (h - dh) * focusY;
         // cheap blur: average a ring of offset copies (each pass blends 1/k on top of the previous ones)
-        const int N = 9;
+        const int N = blur ? 9 : 1;
         const float R = 14;
         for (int i = 0; i < N; i++) {
             float a = i == 0 ? 0 : (float)(i - 1) / (N - 1) * 6.2831853f;
@@ -341,12 +500,12 @@ void HeroBackdrop::draw(NVGcontext* vg, float x, float y, float w, float h, brls
     // overall dim, then a left-side fade for the text and a bottom fade into the page
     nvgBeginPath(vg);
     nvgRect(vg, x, y, w, h);
-    nvgFillColor(vg, nvgRGBA(0, 0, 0, 90));
+    nvgFillColor(vg, nvgRGBA(0, 0, 0, (unsigned char)dim));
     nvgFill(vg);
 
     nvgBeginPath(vg);
-    nvgRect(vg, x, y, w * 0.72f, h);
-    nvgFillPaint(vg, nvgLinearGradient(vg, x, y, x + w * 0.72f, y, nvgRGBA(0, 0, 0, 245), nvgRGBA(0, 0, 0, 0)));
+    nvgRect(vg, x, y, w * leftFade, h);
+    nvgFillPaint(vg, nvgLinearGradient(vg, x, y, x + w * leftFade, y, nvgRGBA(0, 0, 0, 245), nvgRGBA(0, 0, 0, 0)));
     nvgFill(vg);
 
     nvgBeginPath(vg);

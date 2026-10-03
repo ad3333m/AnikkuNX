@@ -59,6 +59,7 @@ class HomeView : public TabBase {
     brls::Box* buildHero();
     void rebuildSourceRows();
     void loadContinueWatching();
+    void continueOptions(const GridItem& it);
     void offerSlides(int rank, const std::vector<GridItem>& items, const std::string& sourceName,
                      const std::string& lang);
     void showSlide(int index);

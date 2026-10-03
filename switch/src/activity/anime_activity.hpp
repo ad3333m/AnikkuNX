@@ -3,12 +3,19 @@
 #include <borealis.hpp>
 #include <nlohmann/json.hpp>
 
+#include <climits>
+#include <memory>
+#include <vector>
+
+#include "app/meta.hpp"
 #include "util/async.hpp"
 #include "view/cover_image.hpp"
 
 class EpisodeDataSource;
+class SeriesHero;
+class EpisodeRow;
 
-/** Pagina di un anime: copertina, trama, libreria e lista episodi (o stagioni). */
+/** Series page in the Crunchyroll layout: artwork header, then a grid of episode cards. */
 class AnimeActivity : public brls::Activity {
   public:
     AnimeActivity(std::string sourceId, std::string url, std::string title, std::string thumbnail);
@@ -22,30 +29,34 @@ class AnimeActivity : public brls::Activity {
     void chooseVideo(int index);
     /** Mette l'episodio nella coda dei download (offline). */
     void downloadEpisode(int index);
+    void episodeOptions(int index);
     void openSeason(int index);
     void toggleOrder();
+    void toggleLibrary();
+    void playContinue();
 
-  private:
-    void load(bool cached = false);
-    void render();
-    void updateLibraryButton();
+    // read by the header and episode cells
+    const nlohmann::json& items() const;
+    bool seasons() const;
     int continueIndex() const;
-
     std::string sourceId, url, title, thumbnail;
     nlohmann::json data;
+    std::shared_ptr<const meta::Info> info;
     bool inLibrary = false;
     bool loadedOnce = false;
     bool oldestFirst = false;  // ordine episodi: dal primo invece che dall'ultimo
-    AliveToken alive = makeAlive();
+    std::string error;
+    SeriesHero* hero = nullptr;
+    std::vector<EpisodeRow*> rows;
 
-    brls::Label* titleLabel = nullptr;
-    brls::Label* metaLabel = nullptr;
-    brls::Label* descLabel = nullptr;
-    brls::Label* statusLabel = nullptr;
-    CoverImage* cover = nullptr;
-    brls::Button* libraryButton = nullptr;
-    brls::Button* resumeButton = nullptr;
-    brls::Button* orderButton = nullptr;
+  private:
+    void load(bool cached = false);
+    void loadMeta();
+    void render();
+    void refreshCells();
+
+    AliveToken alive = makeAlive();
     brls::RecyclerFrame* recycler = nullptr;
     EpisodeDataSource* dataSource = nullptr;
+    size_t shownCount = SIZE_MAX;
 };

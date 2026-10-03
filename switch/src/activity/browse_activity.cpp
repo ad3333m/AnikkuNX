@@ -3,6 +3,7 @@
 
 #include "activity/anime_activity.hpp"
 #include "app/api.hpp"
+#include "view/crunchy.hpp"
 
 using json = nlohmann::json;
 
@@ -58,13 +59,12 @@ brls::View* BrowseActivity::createContentView() {
     };
     root->addView(grid);
 
-    root->getAppletFrameItem()->title = sourceName;
-    auto* frame = new brls::AppletFrame(root);
-    frame->registerAction(tr("Cerca"), brls::BUTTON_Y, [this](brls::View*) {
+    auto* page = cr::page(sourceName, root);
+    page->registerAction("Search", brls::BUTTON_Y, [this](brls::View*) {
         askQuery();
         return true;
     });
-    return frame;
+    return page;
 }
 
 void BrowseActivity::onContentAvailable() {
