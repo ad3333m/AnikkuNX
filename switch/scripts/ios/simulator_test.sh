@@ -16,8 +16,8 @@ cmake -B build-sim -G Xcode -DPLATFORM_IOS=ON -DPLATFORM=SIMULATORARM64 -DDEPLOY
 cmake --build build-sim --config Release -- -quiet CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO
 APP=$(find build-sim -type d -name "AnikkuNX.app" -path "*iphonesimulator*" | head -1)
 [ -n "$APP" ] || { echo "simulator app not found"; exit 1; }
-codesign --force --sign - "$APP/AnikkuNX"   # arm64 simulator binaries must carry a signature
 set +e
+codesign -dv "$APP/AnikkuNX" 2>&1 | head -5   # the linker already ad-hoc signs arm64 simulator binaries
 
 xcrun simctl list devicetypes | grep -i -E "iphone 1[6-7] pro max|ipad pro" | tee "$OUT/devicetypes.txt"
 run_on() {
