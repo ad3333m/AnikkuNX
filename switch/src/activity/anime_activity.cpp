@@ -92,7 +92,7 @@ class SeriesHero : public brls::RecyclerCell {
         buttons->setAlignItems(brls::AlignItems::CENTER);
         buttons->setMarginTop(18);
         watch = new cr::CtaButton("START WATCHING", true, true, [this] { act->playContinue(); });
-        watch->setVisibility(brls::Visibility::GONE);
+        watch->setWidth(280);
         buttons->addView(watch);
         listBtn = new brls::Box(brls::Axis::ROW);
         listBtn->setFocusable(true);
@@ -156,13 +156,14 @@ class SeriesHero : public brls::RecyclerCell {
         head->addView(gap2);
         sortBtn = new cr::CtaButton("NEWEST FIRST", false, false, [this] { act->toggleOrder(); });
         sortBtn->setHeight(38);
+        sortBtn->setWidth(170);
         head->addView(sortBtn);
         addView(head);
     }
 
     brls::View* getDefaultFocus() override {
         if (lastChild && lastChild->getVisibility() == brls::Visibility::VISIBLE) return lastChild;
-        return watch->getVisibility() == brls::Visibility::VISIBLE ? (brls::View*)watch : listBtn;
+        return watch;
     }
 
     void onChildFocusGained(brls::View* directChild, brls::View* focusedView) override {
@@ -272,9 +273,8 @@ class SeriesHero : public brls::RecyclerCell {
                 if (e.value("watched", false) || e.value("position", 0.0) > 5) anyWatched = true;
             std::string verb = ep.value("position", 0.0) > 5 ? "CONTINUE" : anyWatched ? "WATCH NEXT" : "START WATCHING";
             watch->setText(tag.empty() ? verb : verb + " " + tag);
-            watch->setVisibility(brls::Visibility::VISIBLE);
         } else {
-            watch->setVisibility(brls::Visibility::GONE);
+            watch->setText(seasons ? "PICK A SEASON" : "START WATCHING");
         }
     }
 
@@ -645,6 +645,22 @@ class EpisodeRow : public brls::RecyclerCell {
 
 // ----------------------------------------------------------------------------- data source
 
+/** Recycler that starts at the top: borealis centres the first row, which hides half of the tall header. */
+class SeriesRecycler : public brls::RecyclerFrame {
+  public:
+    void onLayout() override {
+        bool first = !laidOut;
+        brls::RecyclerFrame::onLayout();
+        if (first && getWidth() > 0) {
+            laidOut = true;
+            setContentOffsetY(0, false);
+        }
+    }
+
+  private:
+    bool laidOut = false;
+};
+
 class EpisodeDataSource : public brls::RecyclerDataSource {
   public:
     explicit EpisodeDataSource(AnimeActivity* a) : act(a) {}
@@ -683,7 +699,7 @@ const json& AnimeActivity::items() const { return dataSource->items; }
 bool AnimeActivity::seasons() const { return dataSource->seasons; }
 
 brls::View* AnimeActivity::createContentView() {
-    recycler = new brls::RecyclerFrame();
+    recycler = new SeriesRecycler();
     recycler->setScrollingIndicatorVisible(false);
     recycler->estimatedRowHeight = ROW_H;
     recycler->registerCell("Header", [] { return brls::RecyclerHeader::create(); });
@@ -771,6 +787,7 @@ void AnimeActivity::render() {
     if (dataSource->items.size() != shownCount) {
         shownCount = dataSource->items.size();
         recycler->reloadData();
+        recycler->setContentOffsetY(0, false);
     }
     refreshCells();
 }
@@ -807,6 +824,10 @@ void AnimeActivity::toggleLibrary() {
 }
 
 void AnimeActivity::playContinue() {
+    if (seasons()) {
+        if (!items().empty()) openSeason(0);
+        return;
+    }
     int i = continueIndex();
     if (i >= 0) playEpisode(i);
 }

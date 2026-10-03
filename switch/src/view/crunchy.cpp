@@ -223,8 +223,10 @@ CtaButton::CtaButton(const std::string& text, bool filled, bool playGlyph, std::
         setBorderColor(orange());
         setBorderThickness(2);
     }
+    setShrink(0);
     if (playGlyph) addView(new PlayGlyph(fg));
     lbl = label(text, 16, fg, true);
+    lbl->setSingleLine(true);
     if (playGlyph) lbl->setMarginLeft(10);
     addView(lbl);
     registerClickAction([onClick](brls::View*) {

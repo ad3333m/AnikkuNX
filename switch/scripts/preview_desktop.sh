@@ -57,8 +57,7 @@ shot 07-settings 4
 press Down 6
 shot 08-settings-scrolled 2
 press Escape
-press Up 12
-press Right
+press Left 5
 press Return
 shot 09-browse 4
 press Escape
