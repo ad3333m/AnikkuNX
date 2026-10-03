@@ -8,7 +8,7 @@ OUT="$ROOT/preview"
 mkdir -p "$OUT"
 
 bash scripts/setup.sh
-cmake -B build-desktop -DPLATFORM_DESKTOP=ON -DUSE_SYSTEM_GLFW=ON -DCMAKE_BUILD_TYPE=Release
+cmake -B build-desktop -DPLATFORM_DESKTOP=ON -DGLFW_BUILD_WAYLAND=OFF -DCMAKE_BUILD_TYPE=Release
 make -C build-desktop -j"$(nproc)" AnikkuNX
 
 mkdir -p ~/.config/AnikkuNX

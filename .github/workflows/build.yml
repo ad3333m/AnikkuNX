@@ -49,7 +49,9 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends build-essential cmake pkg-config git \
-            libmpv-dev libcurl4-openssl-dev libglfw3-dev libgl-dev libgl1-mesa-dri xvfb xdotool imagemagick
+            libmpv-dev libcurl4-openssl-dev libgl-dev libgl1-mesa-dri xvfb xdotool imagemagick \
+            libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libxext-dev libxkbcommon-dev \
+            libwayland-dev wayland-protocols
 
       - name: Build and screenshot the UI
         run: bash switch/scripts/preview_desktop.sh
