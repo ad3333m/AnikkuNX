@@ -11,6 +11,9 @@
 #include "view/anime_grid.hpp"
 #include "view/crunchy.hpp"
 
+#include <borealis/extern/nanovg/stb_image.h>
+#include <cstring>
+
 using json = nlohmann::json;
 
 static std::string fmtTime(double s) {
@@ -50,10 +53,54 @@ static int lastColumn = 0;  // keeps the column when moving between grid rows
 
 // ----------------------------------------------------------------------------- header
 
-/** Title logo drawn to fit its box, anchored bottom-left (brls::Image sizes itself before the PNG arrives). */
-class LogoImage : public CoverImage {
+/**
+ * Title logo drawn to fit its box, anchored bottom-left. TVDB "clear logos" often sit in the
+ * middle of a big transparent canvas, so the image is decoded here and cropped to its visible part.
+ */
+class LogoImage : public brls::Image {
   public:
     LogoImage() { setBackgroundColor(nvgRGBA(0, 0, 0, 0)); }
+    ~LogoImage() override { *alive = false; }
+
+    void load(const std::string& url) {
+        current = url;
+        clear();
+        if (url.empty()) return;
+        std::string u = url;
+        runAsync<std::shared_ptr<Pixels>>(
+            alive,
+            [u] {
+                std::string data = api::download(u);
+                int w = 0, h = 0, c = 0;
+                unsigned char* px = stbi_load_from_memory((const unsigned char*)data.data(), (int)data.size(), &w, &h, &c, 4);
+                if (!px) throw std::runtime_error("logo decode failed");
+                int x0 = w, y0 = h, x1 = -1, y1 = -1;
+                for (int y = 0; y < h; y++)
+                    for (int x = 0; x < w; x++)
+                        if (px[((size_t)y * w + x) * 4 + 3] > 16) {
+                            x0 = std::min(x0, x);
+                            x1 = std::max(x1, x);
+                            y0 = std::min(y0, y);
+                            y1 = std::max(y1, y);
+                        }
+                if (x1 < x0) x0 = 0, y0 = 0, x1 = w - 1, y1 = h - 1;
+                auto out = std::make_shared<Pixels>();
+                out->w = x1 - x0 + 1;
+                out->h = y1 - y0 + 1;
+                out->rgba.resize((size_t)out->w * out->h * 4);
+                for (int y = 0; y < out->h; y++)
+                    memcpy(&out->rgba[(size_t)y * out->w * 4], px + ((size_t)(y0 + y) * w + x0) * 4, (size_t)out->w * 4);
+                stbi_image_free(px);
+                return out;
+            },
+            [this, u](std::shared_ptr<Pixels> p) {
+                if (u != current) return;
+                int tex = nvgCreateImageRGBA(brls::Application::getNVGContext(), p->w, p->h, 0, p->rgba.data());
+                if (tex) innerSetImage(tex);
+            },
+            [](const std::string&) {});
+    }
+
     void draw(NVGcontext* vg, float x, float y, float w, float h, brls::Style, brls::FrameContext*) override {
         int tex = getTexture();
         float iw = getOriginalImageWidth(), ih = getOriginalImageHeight();
@@ -65,6 +112,14 @@ class LogoImage : public CoverImage {
         nvgFillPaint(vg, nvgImagePattern(vg, ox, oy, dw, dh, 0, tex, 1.0f));
         nvgFill(vg);
     }
+
+  private:
+    struct Pixels {
+        int w = 0, h = 0;
+        std::vector<unsigned char> rgba;
+    };
+    AliveToken alive = makeAlive();
+    std::string current;
 };
 
 class SeriesHero : public brls::RecyclerCell {
@@ -213,8 +268,7 @@ class SeriesHero : public brls::RecyclerCell {
         std::string logoUrl = info ? info->logo : "";
         if (logoUrl != shownLogo) {
             shownLogo = logoUrl;
-            logo->clear();
-            logo->setUrl(logoUrl);
+            logo->load(logoUrl);
             logo->setVisibility(logoUrl.empty() ? brls::Visibility::GONE : brls::Visibility::VISIBLE);
             titleText->setVisibility(brls::Visibility::VISIBLE);
         }
@@ -296,7 +350,7 @@ class SeriesHero : public brls::RecyclerCell {
 
   private:
     AnimeActivity* act;
-    CoverImage* logo;
+    LogoImage* logo;
     brls::Label *titleText, *kicker, *meta, *desc, *details, *listTitle, *count, *status;
     cr::CtaButton *watch, *sortBtn;
     brls::Box* listBtn;
