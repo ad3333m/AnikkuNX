@@ -76,6 +76,8 @@ target_include_directories(gumbo PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/library/gumb
 target_compile_options(gumbo PRIVATE -w)
 if (PLATFORM_SWITCH)
     list(APPEND MAIN_SRC ${BOREALIS_LIBRARY}/lib/platforms/switch/switch_wrapper.c)
+elseif (PLATFORM_IOS)
+    list(APPEND MAIN_SRC ${CMAKE_CURRENT_SOURCE_DIR}/ios/openssl_engine_stubs.c)
 endif ()
 
 program_target(${PROJECT_NAME} "${MAIN_SRC}")
