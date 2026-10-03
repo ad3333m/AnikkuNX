@@ -99,6 +99,7 @@ class AppletWarning : public brls::Box {
 
 brls::View* MainActivity::createContentView() {
     auto* tabs = new brls::TabFrame();
+    tabs->addTab(tr("Scopri"), [] { return new DiscoverTab(); });
     tabs->addTab(tr("Continua a guardare"), [] { return new HistoryTab(); });
     tabs->addTab(tr("Libreria"), [] { return new LibraryTab(); });
     tabs->addTab(tr("Scaricati"), [] { return new DownloadsTab(); });
@@ -158,6 +159,248 @@ static std::vector<GridItem> gridFromAnimeArray(const json& arr) {
         items.push_back(it);
     }
     return items;
+}
+
+// ============================================================================ DiscoverTab (home in stile Netflix/Crunchyroll)
+
+namespace {
+
+/** Oversized "hero" banner at the top of the Discover tab. Shows the first popular anime
+ *  of the first enabled source as a big tappable panel, with a "Guarda" button-like hint. */
+class HeroPanel : public brls::Box {
+  public:
+    HeroPanel() : brls::Box(brls::Axis::ROW) {
+        setHeight(240);
+        setMargins(10, 0, 20, 0);
+        setPadding(22, 22, 22, 22);
+        setCornerRadius(18);
+        setBackgroundColor(nvgRGBA(32, 32, 42, 255));
+        setAlignItems(brls::AlignItems::CENTER);
+        setFocusable(true);
+        setHighlightCornerRadius(20);
+    }
+    void draw(NVGcontext* vg, float x, float y, float width, float height, brls::Style style,
+              brls::FrameContext* ctx) override {
+        // soft gradient so the hero reads as a Netflix-style billboard even without art
+        NVGpaint grad = nvgLinearGradient(vg, x, y, x + width, y, nvgRGBA(90, 36, 140, 220), nvgRGBA(32, 32, 42, 255));
+        nvgBeginPath(vg);
+        nvgRoundedRect(vg, x, y, width, height, 18);
+        nvgFillPaint(vg, grad);
+        nvgFill(vg);
+        brls::Box::draw(vg, x, y, width, height, style, ctx);
+    }
+};
+
+}  // namespace
+
+DiscoverTab::DiscoverTab() {
+    content = new brls::Box(brls::Axis::COLUMN);
+    content->setPadding(10, 30, 30, 30);
+    content->setAlignItems(brls::AlignItems::STRETCH);
+
+    auto* sf = new brls::ScrollingFrame();
+    sf->setGrow(1);
+    sf->setContentView(content);
+    this->addView(sf);
+
+    buildStatic();
+    reloadDynamic();
+}
+
+void DiscoverTab::willAppear(bool resetState) {
+    TabBase::willAppear(resetState);
+    if (appeared) {
+        // the user may have added items to the library or watched something
+        loadContinueWatching();
+        loadLibraryRow();
+    }
+    appeared = true;
+}
+
+void DiscoverTab::buildStatic() {
+    // ---- Hero banner
+    heroBox = new HeroPanel();
+
+    auto* heroCol = new brls::Box(brls::Axis::COLUMN);
+    heroCol->setGrow(1);
+    heroCol->setAlignItems(brls::AlignItems::FLEX_START);
+    heroCol->setJustifyContent(brls::JustifyContent::CENTER);
+
+    auto* tag = new brls::Label();
+    tag->setText(tr("In primo piano"));
+    tag->setFontSize(14);
+    tag->setTextColor(nvgRGB(255, 196, 64));
+    heroCol->addView(tag);
+
+    heroTitle = new brls::Label();
+    heroTitle->setText(tr("Scegli una fonte per iniziare"));
+    heroTitle->setFontSize(32);
+    heroTitle->setTextColor(nvgRGB(245, 245, 250));
+    heroTitle->setMarginTop(6);
+    heroCol->addView(heroTitle);
+
+    heroMeta = new brls::Label();
+    heroMeta->setText("");
+    heroMeta->setFontSize(16);
+    heroMeta->setTextColor(nvgRGB(200, 200, 210));
+    heroMeta->setMarginTop(8);
+    heroCol->addView(heroMeta);
+
+    heroHintBox = new brls::Box(brls::Axis::ROW);
+    heroHintBox->setBackgroundColor(nvgRGBA(214, 51, 108, 255));
+    heroHintBox->setCornerRadius(6);
+    heroHintBox->setPadding(8, 18, 8, 18);
+    heroHintBox->setMarginTop(16);
+    heroHintBox->setVisibility(brls::Visibility::GONE);
+    heroHint = new brls::Label();
+    heroHint->setText("");
+    heroHint->setFontSize(15);
+    heroHint->setTextColor(nvgRGB(255, 255, 255));
+    heroHintBox->addView(heroHint);
+    heroCol->addView(heroHintBox);
+
+    heroBox->addView(heroCol);
+
+    heroBox->registerClickAction([this](brls::View*) {
+        if (!heroReady) return true;
+        brls::Application::pushActivity(new AnimeActivity(heroItem.sourceId, heroItem.url, heroItem.title, heroItem.thumbnail));
+        return true;
+    });
+    heroBox->addGestureRecognizer(new brls::TapGestureRecognizer(heroBox));
+    content->addView(heroBox);
+
+    // ---- Continue watching
+    continueRow = new AnimeRow(tr("Continua a guardare"));
+    continueRow->onSelect = [](const GridItem& it) {
+        brls::Application::pushActivity(new AnimeActivity(it.sourceId, it.url, it.title, it.thumbnail));
+    };
+    continueRow->setHidden(true);  // revealed when items arrive
+    content->addView(continueRow);
+
+    // ---- Library
+    libraryRow = new AnimeRow(tr("La tua libreria"));
+    libraryRow->onSelect = [](const GridItem& it) {
+        brls::Application::pushActivity(new AnimeActivity(it.sourceId, it.url, it.title, it.thumbnail));
+    };
+    libraryRow->setHidden(true);
+    content->addView(libraryRow);
+}
+
+void DiscoverTab::reloadDynamic() {
+    loadContinueWatching();
+    loadLibraryRow();
+
+    // one horizontal row per enabled source, labelled with the language
+    for (auto* r : sourceRows) content->removeView(r);
+    sourceRows.clear();
+
+    runAsync<json>(
+        alive, [] { return api::sources(); },
+        [this](json arr) {
+            if (arr.empty()) return;
+            bool firstHero = true;
+            int idx = 0;
+            for (auto& s : arr) {
+                std::string id = s.value("id", "");
+                std::string name = s.value("name", "");
+                std::string lang = s.value("lang", "");
+
+                std::string title;
+                if (idx == 0)
+                    title = tr("Di tendenza su {}", name);
+                else
+                    title = name;
+                auto* row = new AnimeRow(title);
+                row->setSubtitle(i18n::languageName(lang));
+                row->onSelect = [](const GridItem& it) {
+                    brls::Application::pushActivity(new AnimeActivity(it.sourceId, it.url, it.title, it.thumbnail));
+                };
+                bool supportsLatest = s.value("supportsLatest", false);
+                row->onSeeAll = [id, name, supportsLatest] {
+                    brls::Application::pushActivity(new BrowseActivity(id, name, supportsLatest));
+                };
+                row->showLoading();
+                content->addView(row);
+                sourceRows.push_back(row);
+                loadSourceRow(id, name, row);
+                if (firstHero) {
+                    firstHero = false;
+                    // reuse this fetch's first item for the hero via a lambda
+                }
+                idx++;
+            }
+        },
+        [](const std::string&) {});
+}
+
+void DiscoverTab::loadContinueWatching() {
+    if (!continueRow) return;
+    runAsync<json>(
+        alive, [] { return api::history(); },
+        [this](json arr) {
+            std::vector<GridItem> items;
+            int n = 0;
+            for (auto& h : arr) {
+                if (n++ >= 12) break;
+                std::string sub = h.value("episodeName", "");
+                items.push_back({h.value("sourceId", ""), h.value("animeUrl", ""), h.value("title", ""), sub,
+                                 h.value("thumbnail", ""), h});
+            }
+            if (items.empty()) {
+                continueRow->setHidden(true);
+            } else {
+                continueRow->setHidden(false);
+                continueRow->setItems(items);
+            }
+        },
+        [this](const std::string&) { continueRow->setHidden(true); });
+}
+
+void DiscoverTab::loadLibraryRow() {
+    if (!libraryRow) return;
+    runAsync<json>(
+        alive, [] { return api::library(); },
+        [this](json arr) {
+            auto items = gridFromAnimeArray(arr);
+            if (items.size() > 14) items.resize(14);
+            if (items.empty()) {
+                libraryRow->setHidden(true);
+            } else {
+                libraryRow->setHidden(false);
+                libraryRow->setItems(items);
+            }
+        },
+        [this](const std::string&) { libraryRow->setHidden(true); });
+}
+
+void DiscoverTab::loadSourceRow(const std::string& sourceId, const std::string& sourceName, AnimeRow* row) {
+    runAsync<json>(
+        alive, [sourceId] { return api::browse(sourceId, "popular", 1); },
+        [this, row, sourceName](json r) {
+            std::vector<GridItem> items;
+            int n = 0;
+            for (auto& a : r.value("animes", json::array())) {
+                if (n++ >= 16) break;
+                items.push_back({a.value("sourceId", ""), a.value("url", ""), a.value("title", ""), sourceName,
+                                 a.value("thumbnail", ""), a});
+            }
+            if (items.empty()) {
+                row->showMessage(tr("Nessun risultato"));
+            } else {
+                row->setItems(items);
+                if (!heroReady) setHero(items.front(), sourceName);
+            }
+        },
+        [row](const std::string& err) { row->showMessage(err); });
+}
+
+void DiscoverTab::setHero(const GridItem& item, const std::string& sourceName) {
+    heroReady = true;
+    heroItem = item;
+    heroTitle->setText(item.title);
+    heroMeta->setText(sourceName);
+    heroHint->setText(tr("\xE2\x96\xB6  Guarda ora"));
+    heroHintBox->setVisibility(brls::Visibility::VISIBLE);
 }
 
 // ============================================================================ Nuovi episodi

@@ -5,6 +5,7 @@
 
 #include "util/async.hpp"
 #include "view/anime_grid.hpp"
+#include "view/anime_row.hpp"
 
 /** Controlla i nuovi episodi della libreria appena la console e' connessa a Internet. */
 void checkNewEpisodesWhenOnline(int attempt = 0);
@@ -23,6 +24,39 @@ class TabBase : public brls::Box {
 
   protected:
     AliveToken alive = makeAlive();
+};
+
+/**
+ * Netflix/Crunchyroll-style landing tab: a hero banner on top, then a
+ * stack of horizontal rows (Continue watching, Trending, Library, one row
+ * per enabled source). Loads popular items from every enabled source so
+ * the user picks straight from thumbnails instead of a sources list.
+ */
+class DiscoverTab : public TabBase {
+  public:
+    DiscoverTab();
+    void willAppear(bool resetState) override;
+
+  private:
+    void buildStatic();
+    void reloadDynamic();
+    void loadContinueWatching();
+    void loadLibraryRow();
+    void loadSourceRow(const std::string& sourceId, const std::string& sourceName, AnimeRow* row);
+    void setHero(const GridItem& item, const std::string& sourceName);
+
+    brls::Box* content = nullptr;
+    brls::Box* heroBox = nullptr;
+    brls::Label* heroTitle = nullptr;
+    brls::Label* heroMeta = nullptr;
+    brls::Label* heroHint = nullptr;
+    brls::Box* heroHintBox = nullptr;
+    GridItem heroItem;
+    bool heroReady = false;
+    AnimeRow* continueRow = nullptr;
+    AnimeRow* libraryRow = nullptr;
+    std::vector<AnimeRow*> sourceRows;
+    bool appeared = false;
 };
 
 class HistoryTab : public TabBase {
