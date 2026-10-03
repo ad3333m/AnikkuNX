@@ -1200,10 +1200,10 @@ std::vector<Video> vidLand(const std::string& url) {
 
 // ---- Aincrad / anizmplayer (tr/anizm/extractors/AincradExtractor)
 std::vector<Video> aincrad(const std::string& url) {
-    const std::string DOMAIN = "https://anizmplayer.com";
+    const std::string PLAYER_ORIGIN = "https://anizmplayer.com";
     std::string hash = substringBefore(afterLast(url, "video/"), "/");
-    http::Headers h = {{"Origin", DOMAIN}, {"Referer", url}, {"X-Requested-With", "XMLHttpRequest"}};
-    json j = parseJson(httpPost(DOMAIN + "/player/index.php?data=" + hash + "&do=getVideo",
+    http::Headers h = {{"Origin", PLAYER_ORIGIN}, {"Referer", url}, {"X-Requested-With", "XMLHttpRequest"}};
+    json j = parseJson(httpPost(PLAYER_ORIGIN + "/player/index.php?data=" + hash + "&do=getVideo",
                                 formBody({{"hash", hash}, {"r", "https://anizm.net/"}}), h));
     std::string link = jstr(j, "securedLink");
     if (link.empty()) return {};
