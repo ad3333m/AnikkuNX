@@ -233,6 +233,7 @@ HomeView::HomeView() {
     auto* scroll = new brls::ScrollingFrame();
     scroll->setGrow(1);
     scroll->setScrollingBehavior(brls::ScrollingBehavior::CENTERED);
+    scroll->setScrollingIndicatorVisible(false);
     scroll->setContentView(content);
     addView(scroll);
 
@@ -439,8 +440,9 @@ void HomeView::rebuildSourceRows() {
     if (arr.empty()) {
         heroKicker->setText("GET STARTED");
         heroTitle->setText("Choose your anime sources");
-        heroDesc->setText("Pick the sites AnikkuNX streams from. You can change them any time with the gear icon in "
-                          "the top right.");
+        heroDesc->setText(cr::wrap("Pick the sites AnikkuNX streams from. You can change them any time with the gear "
+                                   "icon in the top right.",
+                                   16, 596));
         watchLabel->setText("CHOOSE SOURCES");
         return;
     }
@@ -579,7 +581,7 @@ void HomeView::loadSlideDetails(int index) {
             desc = oneLine(it->second.value("description", ""));
         }
         heroMeta->setText(meta);
-        heroDesc->setText(cr::ellipsize(desc, 230));
+        heroDesc->setText(cr::wrap(cr::ellipsize(desc, 230), 16, 596));
     };
     const Slide& s = slides[index];
     apply(s);

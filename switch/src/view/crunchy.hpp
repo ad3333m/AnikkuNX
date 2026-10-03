@@ -23,6 +23,8 @@ const unsigned ICON_SEARCH = 0xE8B6, ICON_SETTINGS = 0xE8B8, ICON_BOOKMARK = 0xE
                ICON_WARNING = 0xE002;
 
 std::string ellipsize(const std::string& s, size_t maxChars);
+/** Breaks text into lines that fit `width` with explicit newlines (borealis keeps a leading space on wrapped lines). */
+std::string wrap(const std::string& s, float fontSize, float width);
 
 /** Label drawn twice with a sub-pixel offset: the console font has no bold weight. */
 class BoldLabel : public brls::Label {

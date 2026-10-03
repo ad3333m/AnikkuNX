@@ -24,6 +24,32 @@ std::string ellipsize(const std::string& s, size_t maxChars) {
     return out + "\xE2\x80\xA6";
 }
 
+std::string wrap(const std::string& s, float fontSize, float width) {
+    NVGcontext* vg = brls::Application::getNVGContext();
+    if (!vg || s.empty()) return s;
+    nvgSave(vg);
+    nvgFontFaceId(vg, brls::Application::getDefaultFont());
+    nvgFontSize(vg, fontSize);
+    nvgTextLetterSpacing(vg, 0);
+    std::string out;
+    const char* p = s.c_str();
+    const char* end = p + s.size();
+    NVGtextRow rows[8];
+    int n;
+    while (p < end && (n = nvgTextBreakLines(vg, p, end, width, rows, 8)) > 0) {
+        for (int i = 0; i < n; i++) {
+            std::string line(rows[i].start, rows[i].end);
+            size_t a = line.find_first_not_of(' ');
+            if (a == std::string::npos) continue;
+            if (!out.empty()) out += "\n";
+            out += line.substr(a);
+        }
+        p = rows[n - 1].next;
+    }
+    nvgRestore(vg);
+    return out;
+}
+
 void BoldLabel::draw(NVGcontext* vg, float x, float y, float width, float height, brls::Style style,
                      brls::FrameContext* ctx) {
     brls::Label::draw(vg, x, y, width, height, style, ctx);
@@ -243,6 +269,7 @@ PosterRow::PosterRow(const std::string& title, const std::string& subtitle) : br
     scroller = new brls::HScrollingFrame();
     scroller->setHeight(std::round(CARD_W * 1.5f) + 84);
     scroller->setScrollingBehavior(brls::ScrollingBehavior::NATURAL);
+    scroller->setScrollingIndicatorVisible(false);
     scroller->setContentView(strip);
     addView(scroller);
 }

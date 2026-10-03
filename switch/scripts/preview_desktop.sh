@@ -34,20 +34,22 @@ shot() { sleep "${2:-3}"; import -window root "$OUT/$1.png"; }
 sleep 50
 WIN=$(xdotool search --name AnikkuNX | head -1 || true)
 [ -n "$WIN" ] && xdotool windowfocus "$WIN" || true
-xdotool mousemove 1270 710
 
-shot 1-home 1
-press Down 2
-shot 2-rows
-press Down 2
-shot 3-more-rows
-press Down 3
-shot 4-further
+shot 01-home 1
+for i in 1 2 3 4 5 6; do
+  press Down
+  shot "0$((i + 1))-down-$i" 2
+done
+shot 08-after-wait 12
+press Right 3
+shot 09-right 2
 press Up 12
 press Right 5
-shot 5-gear-focused 1
+shot 10-gear-focused 1
 press Return
-shot 6-settings 4
+shot 11-settings 4
+press Return
+shot 12-source-picker 4
 
 kill "$APP" || true
 echo "screenshots in $OUT"
