@@ -103,13 +103,23 @@ if (PLATFORM_SWITCH)
             --nacp=${PROJECT_NAME}.nacp --romfsdir=${CMAKE_BINARY_DIR}/resources
     )
 elseif (PLATFORM_IOS)
-    ios_bundle(
-        "${CMAKE_CURRENT_SOURCE_DIR}/ios/LaunchScreen.storyboard"
-        "${CMAKE_CURRENT_SOURCE_DIR}/ios/Images.xcassets"
-        "${CMAKE_CURRENT_SOURCE_DIR}/ios/Info.plist.in"
-        "AnikkuNX"
-        "${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_ALTER}")
+    # (not borealis' ios_bundle: it needs a launch storyboard, whose compiled Info.plist confuses sideloaders)
+    set(IOS_ASSETS "${CMAKE_CURRENT_SOURCE_DIR}/ios/Images.xcassets")
+    set_property(SOURCE ${IOS_ASSETS} PROPERTY MACOSX_PACKAGE_LOCATION "Resources")
+    target_sources(${PROJECT_NAME} PRIVATE ${IOS_ASSETS})
     set_target_properties(${PROJECT_NAME} PROPERTIES
+        MACOSX_BUNDLE TRUE
+        MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/ios/Info.plist.in"
+        MACOSX_BUNDLE_GUI_IDENTIFIER "${PACKAGE_NAME}"
+        MACOSX_BUNDLE_BUNDLE_NAME "AnikkuNX"
+        MACOSX_BUNDLE_BUNDLE_VERSION "${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_ALTER}"
+        MACOSX_BUNDLE_SHORT_VERSION_STRING "${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_ALTER}"
+        XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY ""
+        XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED NO
+        XCODE_ATTRIBUTE_CODE_SIGNING_REQUIRED NO
+        XCODE_ATTRIBUTE_ENABLE_BITCODE NO
+        XCODE_ATTRIBUTE_SKIP_INSTALL NO
+        XCODE_ATTRIBUTE_ASSETCATALOG_COMPILER_APPICON_NAME "AppIcon"
         XCODE_ATTRIBUTE_IPHONEOS_DEPLOYMENT_TARGET "15.0"
         XCODE_ATTRIBUTE_TARGETED_DEVICE_FAMILY "1,2")
     add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
