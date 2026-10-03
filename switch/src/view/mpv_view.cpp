@@ -153,7 +153,13 @@ MpvView::MpvView() {
     mpv_set_option_string(mpv, "demuxer-lavf-o", "extension_picky=0");
     mpv_set_option_string(mpv, "demuxer-lavf-analyzeduration", "0.4");
     mpv_set_option_string(mpv, "demuxer-lavf-probescore", "24");
+#ifdef IOS
+    // VideoToolbox frames copied back to memory: works with the OpenGL ES render API without GL interop
+    mpv_set_option_string(mpv, "hwdec", Config::instance().hardwareDecoding ? "videotoolbox-copy" : "no");
+    mpv_set_option_string(mpv, "ao", "audiounit");
+#else
     mpv_set_option_string(mpv, "hwdec", Config::instance().hardwareDecoding ? "auto" : "no");
+#endif
 #ifdef __SWITCH__
     mpv_set_option_string(mpv, "vd-lavc-dr", "no");
     mpv_set_option_string(mpv, "vd-lavc-threads", "4");

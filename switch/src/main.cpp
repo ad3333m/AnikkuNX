@@ -1,3 +1,10 @@
+#ifdef IOS
+#include <SDL2/SDL_hints.h>
+#include <SDL2/SDL_main.h>
+#include <CoreFoundation/CoreFoundation.h>
+#include <unistd.h>
+#endif
+
 #include <borealis.hpp>
 
 #include <cstdlib>
@@ -13,7 +20,23 @@
 #include "util/async.hpp"
 #include "view/cover_image.hpp"
 
+#ifdef IOS
+/** Resources are copied into <App>.app/resources; borealis and the app open them relative to the cwd. */
+static void enterBundleResources() {
+    CFURLRef url = CFBundleCopyResourcesDirectoryURL(CFBundleGetMainBundle());
+    char path[4096];
+    if (url && CFURLGetFileSystemRepresentation(url, true, (UInt8*)path, sizeof(path)))
+        chdir((std::string(path) + "/resources").c_str());
+    if (url) CFRelease(url);
+}
+#endif
+
 int main(int argc, char* argv[]) {
+#ifdef IOS
+    enterBundleResources();
+    SDL_SetHint(SDL_HINT_ORIENTATIONS, "LandscapeLeft LandscapeRight");
+    SDL_SetHint(SDL_HINT_IOS_HIDE_HOME_INDICATOR, "1");
+#endif
     if (argc > 0 && argv[0]) updater::setAppPath(argv[0]);  // per sostituire il .nro negli aggiornamenti
     for (int i = 1; i < argc; i++) {
         if (std::strcmp(argv[i], "-d") == 0) brls::Logger::setLogLevel(brls::LogLevel::LOG_DEBUG);
@@ -30,7 +53,7 @@ int main(int argc, char* argv[]) {
 #ifdef __SWITCH__
     http::globalInit("romfs:/cacert.pem");
 #else
-    http::globalInit("resources/cacert.pem");
+    http::globalInit(std::string(BRLS_RESOURCES) + "cacert.pem");
 #endif
     Config::instance().load();
     Config::instance().checkPreviousCrash();

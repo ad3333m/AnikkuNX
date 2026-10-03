@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cmath>
 
 #include "activity/anime_activity.hpp"
 #include "activity/browse_activity.hpp"
@@ -105,8 +106,10 @@ void MainActivity::onContentAvailable() {
     if (!Config::instance().sourcesChosen)
         brls::delay(100, [] { brls::Application::pushActivity(new SourcePickerActivity(true)); });
     else {
+#ifdef __SWITCH__
         if (Config::instance().checkUpdates)
             brls::delay(1500, [] { checkForUpdates(false); });  // nuova versione su GitHub?
+#endif
         if (Config::instance().checkNewEpisodes)
             brls::delay(4000, [] { checkNewEpisodesWhenOnline(); });  // nuovi episodi in libreria
     }
@@ -151,7 +154,7 @@ HomeView::HomeView() {
     content->setPaddingBottom(20);
     content->addView(buildHero());
 
-    continueRow = new cr::PosterRow("Continue Watching", "Press + for options");
+    continueRow = new cr::PosterRow("Continue Watching", cr::optionsHint("on a poster"));
     continueRow->onSelect = openAnime;
     continueRow->onOptions = [this](const GridItem& it) { continueOptions(it); };
     continueRow->progressOf = [](const GridItem& it) -> float {
@@ -178,7 +181,7 @@ HomeView::HomeView() {
     content->addView(otherRows);
 
     auto* foot = cr::label("AnikkuNX v" + updater::currentVersion(), 14, cr::dim());
-    foot->setMargins(16, 60, 10, 60);
+    foot->setMargins(16, 60 + cr::sideInset(), 10, 60 + cr::sideInset());
     content->addView(foot);
 
     auto* scroll = new brls::ScrollingFrame();
@@ -212,10 +215,10 @@ void HomeView::willAppear(bool resetState) {
 
 brls::Box* HomeView::buildTopBar() {
     auto* bar = new brls::Box(brls::Axis::ROW);
-    bar->setHeight(64);
+    bar->setHeight(cr::topBarHeight());
     bar->setBackgroundColor(cr::bar());
     bar->setAlignItems(brls::AlignItems::CENTER);
-    bar->setPadding(0, 24, 0, 36);
+    bar->setPadding(0, 24 + cr::sideInset(), 0, 36 + cr::sideInset());
 
     auto* logo = cr::logo();
     logo->setMarginRight(26);
@@ -237,8 +240,10 @@ brls::Box* HomeView::buildTopBar() {
 }
 
 brls::Box* HomeView::buildHero() {
+    // ~470 on the Switch, shorter on the wide iPhone, taller on the 4:3 iPad
+    float heroH = std::min(600.0f, std::max(400.0f, std::round(brls::Application::contentHeight * 0.66f)));
     hero = new brls::Box(brls::Axis::ROW);
-    hero->setHeight(470);
+    hero->setHeight(heroH);
     hero->setAlignItems(brls::AlignItems::CENTER);
     hero->setMarginBottom(4);
 
@@ -247,7 +252,7 @@ brls::Box* HomeView::buildHero() {
 
     auto* col = new brls::Box(brls::Axis::COLUMN);
     col->setGrow(1);
-    col->setPadding(0, 40, 0, 80);
+    col->setPadding(0, 40, 0, 80 + cr::sideInset());
     col->setJustifyContent(brls::JustifyContent::CENTER);
     col->setAlignItems(brls::AlignItems::FLEX_START);
 
@@ -324,10 +329,11 @@ brls::Box* HomeView::buildHero() {
     col->addView(dots);
     hero->addView(col);
 
+    float posterH = std::min(heroH - 96, 420.0f);
     heroPoster = new CoverImage();
-    heroPoster->setWidth(236);
-    heroPoster->setHeight(354);
-    heroPoster->setMarginRight(110);
+    heroPoster->setWidth(std::round(posterH / 1.5f));
+    heroPoster->setHeight(posterH);
+    heroPoster->setMarginRight(110 + cr::sideInset());
     heroPoster->setCornerRadius(2);
     heroPoster->setShadowType(brls::ShadowType::GENERIC);
     heroPoster->setVisibility(brls::Visibility::INVISIBLE);
@@ -339,8 +345,12 @@ brls::Box* HomeView::buildHero() {
     auto next = [this] {
         if (!slides.empty()) showSlide((slide + 1) % (int)slides.size());
     };
-    hero->addView(new cr::HeroArrow(false, prev));
-    hero->addView(new cr::HeroArrow(true, next));
+    auto* leftArrow = new cr::HeroArrow(false, prev);
+    auto* rightArrow = new cr::HeroArrow(true, next);
+    leftArrow->setPositionLeft(cr::sideInset());
+    rightArrow->setPositionRight(cr::sideInset());
+    hero->addView(leftArrow);
+    hero->addView(rightArrow);
     hero->registerAction("Previous", brls::BUTTON_LB, [prev](brls::View*) {
         prev();
         return true;
@@ -979,7 +989,11 @@ SettingsTab::SettingsTab() {
     box->addView(proxy);
 
     // ---- library & updates
+#ifdef __SWITCH__
     box->addView(section("Library & Updates"));
+#else
+    box->addView(section("Library"));
+#endif
     auto* newEps = new brls::BooleanCell();
     newEps->init(tr("Controlla i nuovi episodi della libreria all'avvio"), cfg.checkNewEpisodes, [](bool on) {
         Config::instance().checkNewEpisodes = on;
@@ -987,6 +1001,7 @@ SettingsTab::SettingsTab() {
     });
     box->addView(newEps);
 
+#ifdef __SWITCH__
     auto* autoUpd = new brls::BooleanCell();
     autoUpd->init(tr("Controlla aggiornamenti all'avvio"), cfg.checkUpdates, [](bool on) {
         Config::instance().checkUpdates = on;
@@ -1006,6 +1021,7 @@ SettingsTab::SettingsTab() {
         return true;
     });
     box->addView(upd);
+#endif
 
     // ---- site addresses
     box->addView(section("Site Addresses", "Change an address if one of your sources stops working."));
@@ -1032,6 +1048,7 @@ SettingsTab::SettingsTab() {
 
     // ---- about
     box->addView(section("About"));
+#ifdef __SWITCH__
     auto* fwd = new brls::DetailCell();
     fwd->setText(tr("Icona nella schermata Home (forwarder)"));
     fwd->setDetailText("Sphaira");
@@ -1047,16 +1064,23 @@ SettingsTab::SettingsTab() {
         return true;
     });
     box->addView(fwd);
+#endif
 
     auto* ver = new brls::DetailCell();
     ver->setText(tr("Versione"));
     ver->setDetailText("AnikkuNX v" + updater::currentVersion());
     box->addView(ver);
 
-    auto* about = cr::label(cr::wrap("Library and progress are saved in sdmc:/switch/AnikkuNX. For the most memory, "
-                                     "launch the app by holding R while starting a game.",
-                                     15, 990),
-                            15, cr::dim());
+#ifdef __SWITCH__
+    std::string aboutText = "Library and progress are saved in sdmc:/switch/AnikkuNX. For the most memory, launch the "
+                            "app by holding R while starting a game.";
+#elif defined(IOS)
+    std::string aboutText = "Library, progress and downloads are saved in the Files app under On My iPhone/iPad > "
+                            "AnikkuNX.";
+#else
+    std::string aboutText = "Library and progress are saved in " + Config::instance().configDir() + ".";
+#endif
+    auto* about = cr::label(cr::wrap(aboutText, 15, 990), 15, cr::dim());
     about->setMarginTop(24);
     box->addView(about);
 

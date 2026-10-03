@@ -47,8 +47,34 @@ static std::string epTag(const json& ep) {
 }
 
 static const int COLS = 5;
-static const float CARD_W = 218, CARD_GAP = 19, THUMB_H = 123;
-static const float ROW_H = 262, HERO_H = 530;
+
+/** Grid and header sizes for the current screen (Switch 1280x720, iPhone ~1280x589, iPad Pro ~1280x960). */
+struct Metrics {
+    float inset, gap, cardW, thumbH, rowH, pad, heroH, titleH, titleSize, logoW;
+    int descLines;
+};
+
+static const Metrics& gm() {
+    static const Metrics m = [] {
+        Metrics g{};
+        g.inset = cr::sideInset();
+        g.gap = 18;
+        float width = (float)brls::Application::contentWidth;
+        float avail = width - 2 * (g.inset + 50);
+        g.cardW = std::floor((avail - g.gap * (COLS - 1)) / COLS);
+        g.thumbH = std::round(g.cardW * 9 / 16);
+        g.rowH = g.thumbH + 139;
+        g.pad = std::floor((width - (COLS * g.cardW + (COLS - 1) * g.gap)) / 2);
+        bool phone = cr::isPhone(), tablet = cr::isTablet();
+        g.heroH = phone ? 470 : tablet ? 600 : 530;
+        g.titleH = phone ? 108 : tablet ? 180 : 140;
+        g.titleSize = phone ? 36 : tablet ? 50 : 44;
+        g.logoW = phone ? 420 : tablet ? 600 : 500;
+        g.descLines = phone ? 3 : 4;
+        return g;
+    }();
+    return m;
+}
 static int lastColumn = 0;  // keeps the column when moving between grid rows
 
 // ----------------------------------------------------------------------------- header
@@ -126,8 +152,8 @@ class SeriesHero : public brls::RecyclerCell {
   public:
     explicit SeriesHero(AnimeActivity* a) : act(a) {
         setAxis(brls::Axis::COLUMN);
-        setHeight(HERO_H);
-        setPadding(30, 56, 6, 56);
+        setHeight(gm().heroH);
+        setPadding(30, 56 + gm().inset, 6, 56 + gm().inset);
         setLineColor(nvgRGBA(0, 0, 0, 0));
         setAlignItems(brls::AlignItems::STRETCH);
 
@@ -137,15 +163,15 @@ class SeriesHero : public brls::RecyclerCell {
         addView(art);
 
         auto* titleBox = new brls::Box(brls::Axis::COLUMN);
-        titleBox->setHeight(140);
+        titleBox->setHeight(gm().titleH);
         titleBox->setJustifyContent(brls::JustifyContent::FLEX_END);
         titleBox->setAlignItems(brls::AlignItems::FLEX_START);
         logo = new LogoImage();
-        logo->setWidth(500);
-        logo->setHeight(136);
+        logo->setWidth(gm().logoW);
+        logo->setHeight(gm().titleH - 4);
         logo->setVisibility(brls::Visibility::GONE);
         titleBox->addView(logo);
-        titleText = cr::label("", 44, cr::text(), true);
+        titleText = cr::label("", gm().titleSize, cr::text(), true);
         titleText->setWidth(680);
         titleBox->addView(titleText);
         addView(titleBox);
@@ -272,7 +298,7 @@ class SeriesHero : public brls::RecyclerCell {
             logo->setVisibility(logoUrl.empty() ? brls::Visibility::GONE : brls::Visibility::VISIBLE);
             titleText->setVisibility(brls::Visibility::VISIBLE);
         }
-        titleText->setText(cr::wrap(act->title, 44, 680, 2));
+        titleText->setText(cr::wrap(act->title, gm().titleSize, 680, 2));
 
         std::string src = act->data.is_object() ? act->data.value("sourceName", std::string()) : "";
         kicker->setText(src.empty() ? " " : upper(src));
@@ -303,7 +329,7 @@ class SeriesHero : public brls::RecyclerCell {
                         : act->data.is_object() && act->data["description"].is_string()
                             ? act->data["description"].get<std::string>()
                             : "";
-        desc->setText(cr::wrap(clean(d), 15, 638, 4));
+        desc->setText(cr::wrap(clean(d), 15, 638, gm().descLines));
 
         std::string det;
         auto line = [&det](const std::string& k, const std::string& v) {
@@ -328,7 +354,7 @@ class SeriesHero : public brls::RecyclerCell {
         else if (n == 0)
             status->setText("No episodes available");
         else
-            status->setText(seasons ? "" : "Press + on an episode for more options");
+            status->setText(seasons ? "" : cr::optionsHint("on an episode"));
         sortBtn->setText(act->oldestFirst ? "OLDEST FIRST" : "NEWEST FIRST");
         sortBtn->setVisibility(seasons || n == 0 ? brls::Visibility::GONE : brls::Visibility::VISIBLE);
 
@@ -372,8 +398,8 @@ class EpisodeThumb : public CoverImage {
     int runtime = 0;
 
     EpisodeThumb() {
-        setWidth(CARD_W);
-        setHeight(THUMB_H);
+        setWidth(gm().cardW);
+        setHeight(gm().thumbH);
         setBackgroundColor(nvgRGBA(0, 0, 0, 0));
     }
 
@@ -480,11 +506,24 @@ class DownloadBadge : public brls::View {
     }
 };
 
+/** ⋮ on an episode card: opens Play / Choose Quality / Download (touch equivalent of +). */
+class OptionsButton : public brls::View {
+  public:
+    OptionsButton() {
+        setWidth(26);
+        setHeight(30);
+        setMarginLeft(4);
+    }
+    void draw(NVGcontext* vg, float x, float y, float w, float h, brls::Style, brls::FrameContext*) override {
+        cr::drawOptionsDots(vg, x + w / 2, y + h / 2, 14, false);
+    }
+};
+
 class EpisodeCard : public brls::Box {
   public:
     EpisodeCard(AnimeActivity* a, int column) : brls::Box(brls::Axis::COLUMN), act(a), col(column) {
-        setWidth(CARD_W);
-        if (column < COLS - 1) setMarginRight(CARD_GAP);
+        setWidth(gm().cardW);
+        if (column < COLS - 1) setMarginRight(gm().gap);
         setFocusable(true);
         setHideHighlightBackground(true);
         setHighlightCornerRadius(3);
@@ -494,11 +533,11 @@ class EpisodeCard : public brls::Box {
         addView(thumb);
         kicker = cr::label(" ", 11, cr::dim(), true);
         kicker->setSingleLine(true);
-        kicker->setWidth(CARD_W);
+        kicker->setWidth(gm().cardW);
         kicker->setMarginTop(10);
         addView(kicker);
         title = cr::label(" ", 15, cr::text(), true);
-        title->setWidth(CARD_W);
+        title->setWidth(gm().cardW);
         title->setMarginTop(4);
         addView(title);
         auto* subRow = new brls::Box(brls::Axis::ROW);
@@ -510,6 +549,8 @@ class EpisodeCard : public brls::Box {
         subRow->addView(sub);
         dl = new DownloadBadge();
         subRow->addView(dl);
+        more = new OptionsButton();
+        subRow->addView(more);
         addView(subRow);
 
         registerClickAction([this](brls::View*) {
@@ -535,11 +576,15 @@ class EpisodeCard : public brls::Box {
         addGestureRecognizer(new brls::TapGestureRecognizer([this](brls::TapGestureStatus st, brls::Sound* snd) {
             if (st.state != brls::GestureState::END || index < 0) return;
             *snd = brls::SOUND_CLICK;
-            auto f = dl->getFrame();
-            bool onBadge = dl->getVisibility() == brls::Visibility::VISIBLE && st.position.x >= f.getMinX() - 10 &&
-                           st.position.y >= f.getMinY() - 10;
+            brls::Application::giveFocus(this);
+            auto f = dl->getFrame(), m = more->getFrame();
+            bool lowRow = st.position.y >= f.getMinY() - 10;
+            bool onMore = more->getVisibility() == brls::Visibility::VISIBLE && lowRow && st.position.x >= m.getMinX() - 6;
+            bool onBadge = dl->getVisibility() == brls::Visibility::VISIBLE && lowRow && st.position.x >= f.getMinX() - 8;
             if (act->seasons())
                 act->openSeason(index);
+            else if (onMore)
+                act->episodeOptions(index);
             else if (onBadge)
                 act->downloadEpisode(index);
             else
@@ -576,9 +621,10 @@ class EpisodeCard : public brls::Box {
             thumb->progress = -1;
             thumb->watched = false;
             thumb->runtime = 0;
-            title->setText(cr::wrap(ep.value("title", ""), 15, CARD_W - 2, 2));
+            title->setText(cr::wrap(ep.value("title", ""), 15, gm().cardW - 2, 2));
             sub->setText(" ");
             dl->setVisibility(brls::Visibility::GONE);
+            more->setVisibility(brls::Visibility::GONE);
             episodeUrl.clear();
             return;
         }
@@ -609,7 +655,7 @@ class EpisodeCard : public brls::Box {
             label = tag.empty() ? (name.empty() ? "Episode " + std::to_string(i + 1) : name) : "Episode " + tag.substr(1);
         else
             label = (tag.empty() ? "" : tag + " - ") + name;
-        title->setText(cr::wrap(label, 15, CARD_W - 2, 2));
+        title->setText(cr::wrap(label, 15, gm().cardW - 2, 2));
 
         std::string detail = " ";
         if (w)
@@ -621,6 +667,7 @@ class EpisodeCard : public brls::Box {
         sub->setText(detail);
         sub->setTextColor(w ? cr::orange() : cr::muted());
         dl->setVisibility(brls::Visibility::VISIBLE);
+        more->setVisibility(brls::Visibility::VISIBLE);
         episodeUrl = ep.value("url", "");
         lastText.clear();
         refreshDownload();
@@ -674,6 +721,7 @@ class EpisodeCard : public brls::Box {
     EpisodeThumb* thumb;
     brls::Label *kicker, *title, *sub;
     DownloadBadge* dl;
+    brls::View* more;
     std::string episodeUrl, lastText;
     std::chrono::steady_clock::time_point lastCheck{};
 };
@@ -684,8 +732,8 @@ class EpisodeRow : public brls::RecyclerCell {
 
     explicit EpisodeRow(AnimeActivity* a) : act(a) {
         setAxis(brls::Axis::ROW);
-        setHeight(ROW_H);
-        setPadding(12, 0, 0, (1280 - (COLS * CARD_W + (COLS - 1) * CARD_GAP)) / 2);
+        setHeight(gm().rowH);
+        setPadding(12, 0, 0, gm().pad);
         setAlignItems(brls::AlignItems::FLEX_START);
         setLineColor(nvgRGBA(0, 0, 0, 0));
         for (int c = 0; c < COLS; c++) {
@@ -738,7 +786,9 @@ class EpisodeDataSource : public brls::RecyclerDataSource {
 
     int numberOfSections(brls::RecyclerFrame*) override { return 1; }
     int numberOfRows(brls::RecyclerFrame*, int) override { return 1 + ((int)items.size() + COLS - 1) / COLS; }
-    float heightForRow(brls::RecyclerFrame*, brls::IndexPath index) override { return index.row == 0 ? HERO_H : ROW_H; }
+    float heightForRow(brls::RecyclerFrame*, brls::IndexPath index) override {
+        return index.row == 0 ? gm().heroH : gm().rowH;
+    }
 
     brls::RecyclerCell* cellForRow(brls::RecyclerFrame* recycler, brls::IndexPath index) override {
         if (index.row == 0) {
@@ -769,7 +819,7 @@ bool AnimeActivity::seasons() const { return dataSource->seasons; }
 brls::View* AnimeActivity::createContentView() {
     recycler = new SeriesRecycler();
     recycler->setScrollingIndicatorVisible(false);
-    recycler->estimatedRowHeight = ROW_H;
+    recycler->estimatedRowHeight = gm().rowH;
     recycler->registerCell("Header", [] { return brls::RecyclerHeader::create(); });
     recycler->registerCell("Hero", [this] {
         hero = new SeriesHero(this);
@@ -783,7 +833,7 @@ brls::View* AnimeActivity::createContentView() {
     dataSource = new EpisodeDataSource(this);
     recycler->setDataSource(dataSource);
 
-    auto* root = cr::page("", recycler);
+    auto* root = cr::page("", recycler, nullptr, true);
     // Aggiorna (Y) e Inverti ordine (R3)
     root->registerAction(
         "Refresh", brls::BUTTON_Y,

@@ -18,6 +18,18 @@ inline NVGcolor text() { return nvgRGB(255, 255, 255); }
 inline NVGcolor muted() { return nvgRGB(160, 160, 166); }
 inline NVGcolor dim() { return nvgRGB(110, 110, 118); }
 
+/**
+ * Screen shape. The layout canvas is always 1280 wide and its height follows the display:
+ * Switch 720, iPhone 17 Pro Max (2868x1320) ~589, 12.9" iPad Pro (2732x2048) ~960.
+ */
+bool isPhone();
+bool isTablet();
+/** Horizontal margin that keeps content clear of the iPhone's Dynamic Island and rounded corners. */
+float sideInset();
+float topBarHeight();
+/** "Press +" with a controller, "Tap ⋮" on iOS where touch comes first. */
+std::string optionsHint(const std::string& where);
+
 std::string icon(unsigned cp);
 const unsigned ICON_SEARCH = 0xE8B6, ICON_SETTINGS = 0xE8B8, ICON_BOOKMARK = 0xE866, ICON_BOOKMARK_BORDER = 0xE867,
                ICON_WARNING = 0xE002, ICON_BACK = 0xE5C4, ICON_DOWNLOAD = 0xE2C4, ICON_DONE = 0xE876,
@@ -47,7 +59,8 @@ brls::Box* logo();
  * Black page for secondary screens: a top bar with a back button, the logo and
  * the screen title above `content`. B goes back (or calls onBack when given).
  */
-brls::Box* page(const std::string& title, brls::View* content, std::function<void()> onBack = nullptr);
+brls::Box* page(const std::string& title, brls::View* content, std::function<void()> onBack = nullptr,
+                bool fullBleed = false);
 
 /** Orange (filled) or outlined call-to-action button with an optional leading play glyph. */
 class CtaButton : public brls::Box {
@@ -116,6 +129,10 @@ class PosterCard : public brls::Box {
     GridItem item;
     /** 0..1, drawn as an orange bar along the bottom of the cover (Continue Watching). */
     float progress = -1;
+    /** When set, a ⋮ button on the cover opens the options (touch equivalent of +). */
+    std::function<void()> onOptions;
+    /** Same as pressing A on the card. */
+    std::function<void()> onActivate;
     void draw(NVGcontext* vg, float x, float y, float width, float height, brls::Style style,
               brls::FrameContext* ctx) override;
 
@@ -156,6 +173,9 @@ class HeroBackdrop : public CoverImage {
     void draw(NVGcontext* vg, float x, float y, float width, float height, brls::Style style,
               brls::FrameContext* ctx) override;
 };
+
+/** Draws a ⋮ glyph (three dots) in a dark circle; used as the touch "options" button. */
+void drawOptionsDots(NVGcontext* vg, float cx, float cy, float r, bool circle);
 
 /** Carousel position dots: the active one is a longer orange pill. */
 class PageDots : public brls::View {

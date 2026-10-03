@@ -9,6 +9,10 @@ endif ()
 
 include(${BOREALIS_LIBRARY}/cmake/commonOption.cmake)
 include(${BOREALIS_LIBRARY}/cmake/toolchain.cmake)
+if (PLATFORM_IOS)
+    # the app reads its files (translations, CA bundle) from disk: ship them in the .app instead of libromfs
+    set(USE_LIBROMFS OFF)
+endif ()
 
 project(AnikkuNX)
 set(VERSION_MAJOR "0")
@@ -17,6 +21,7 @@ set(VERSION_ALTER "2")
 set(PROJECT_AUTHOR "Marco")
 set(PROJECT_ICON ${CMAKE_CURRENT_SOURCE_DIR}/resources/icon/icon.jpg)
 set(PROJECT_RESOURCES ${CMAKE_CURRENT_SOURCE_DIR}/resources)
+set(PACKAGE_NAME "com.ad3333m.anikkunx")
 
 add_subdirectory(${BOREALIS_LIBRARY} borealis)
 
@@ -38,6 +43,20 @@ if (PLATFORM_SWITCH)
         list(APPEND APP_PLATFORM_LIB ${WEBP_STATIC_LIBRARIES})
         list(APPEND APP_PLATFORM_OPTION -DHAVE_WEBP)
     endif ()
+elseif (PLATFORM_IOS)
+    # prebuilt static libraries (MPVKit + libcurl), see scripts/ios/fetch_deps.sh
+    set(IOS_DEPS ${CMAKE_CURRENT_SOURCE_DIR}/library/ios-deps)
+    file(GLOB IOS_DEP_LIBS ${IOS_DEPS}/lib/*.a)
+    if (NOT IOS_DEP_LIBS)
+        message(FATAL_ERROR "iOS dependencies missing: run scripts/ios/fetch_deps.sh")
+    endif ()
+    list(APPEND APP_PLATFORM_INCLUDE ${IOS_DEPS}/include)
+    list(APPEND APP_PLATFORM_LIB ${IOS_DEP_LIBS}
+        "-framework AVFoundation" "-framework AudioToolbox" "-framework CoreAudio" "-framework CoreFoundation"
+        "-framework CoreGraphics" "-framework CoreMedia" "-framework CoreText" "-framework CoreVideo"
+        "-framework Foundation" "-framework IOSurface" "-framework Metal" "-framework OpenGLES"
+        "-framework QuartzCore" "-framework Security" "-framework SystemConfiguration" "-framework UIKit"
+        "-framework VideoToolbox" bz2 iconv expat resolv xml2 z c++)
 else ()
     # build desktop (Linux/macOS/Windows) utile per provare l'interfaccia sul PC
     find_package(PkgConfig REQUIRED)
@@ -81,6 +100,18 @@ if (PLATFORM_SWITCH)
         COMMAND ${NX_ELF2NRO_EXE} ${PROJECT_NAME}.elf ${PROJECT_NAME}.nro --icon=${PROJECT_ICON}
             --nacp=${PROJECT_NAME}.nacp --romfsdir=${CMAKE_BINARY_DIR}/resources
     )
+elseif (PLATFORM_IOS)
+    ios_bundle(
+        "${CMAKE_CURRENT_SOURCE_DIR}/ios/LaunchScreen.storyboard"
+        "${CMAKE_CURRENT_SOURCE_DIR}/ios/Images.xcassets"
+        "${CMAKE_CURRENT_SOURCE_DIR}/ios/Info.plist.in"
+        "AnikkuNX"
+        "${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_ALTER}")
+    set_target_properties(${PROJECT_NAME} PROPERTIES
+        XCODE_ATTRIBUTE_IPHONEOS_DEPLOYMENT_TARGET "15.0"
+        XCODE_ATTRIBUTE_TARGETED_DEVICE_FAMILY "1,2")
+    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory ${PROJECT_RESOURCES} "$<TARGET_BUNDLE_DIR:${PROJECT_NAME}>/resources")
 else ()
     add_custom_target(${PROJECT_NAME}.data ALL
         COMMAND ${CMAKE_COMMAND} -E copy_directory ${PROJECT_RESOURCES} ${CMAKE_CURRENT_BINARY_DIR}/resources)

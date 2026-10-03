@@ -7,6 +7,40 @@ namespace cr {
 
 static const float CARD_W = 176;
 
+static float aspect() {
+    float h = (float)brls::Application::contentHeight;
+    return h > 0 ? (float)brls::Application::contentWidth / h : 16.0f / 9.0f;
+}
+
+bool isPhone() { return aspect() > 1.95f; }
+bool isTablet() { return aspect() < 1.5f; }
+float sideInset() { return isPhone() ? 64.0f : 0.0f; }
+float topBarHeight() { return isPhone() ? 56.0f : 64.0f; }
+
+std::string optionsHint(const std::string& where) {
+#ifdef IOS
+    return "Tap â® " + where + " for more options";
+#else
+    return "Press + " + where + " for more options";
+#endif
+}
+
+void drawOptionsDots(NVGcontext* vg, float cx, float cy, float r, bool circle) {
+    if (circle) {
+        nvgBeginPath(vg);
+        nvgCircle(vg, cx, cy, r);
+        nvgFillColor(vg, nvgRGBA(0, 0, 0, 170));
+        nvgFill(vg);
+    }
+    float d = r * 0.42f, dot = std::max(1.6f, r * 0.13f);
+    for (int i = -1; i <= 1; i++) {
+        nvgBeginPath(vg);
+        nvgCircle(vg, cx, cy + i * d, dot);
+        nvgFillColor(vg, nvgRGB(240, 240, 245));
+        nvgFill(vg);
+    }
+}
+
 std::string icon(unsigned cp) {
     std::string s;
     s += (char)(0xE0 | (cp >> 12));
@@ -168,17 +202,17 @@ class Page : public brls::Box {
 
 }  // namespace
 
-brls::Box* page(const std::string& title, brls::View* content, std::function<void()> onBack) {
+brls::Box* page(const std::string& title, brls::View* content, std::function<void()> onBack, bool fullBleed) {
     std::function<void()> back = onBack ? onBack : [] { brls::Application::popActivity(); };
     auto* root = new Page(content);
     root->setGrow(1);
     root->setBackgroundColor(nvgRGB(0, 0, 0));
 
     auto* topBar = new brls::Box(brls::Axis::ROW);
-    topBar->setHeight(64);
+    topBar->setHeight(topBarHeight());
     topBar->setBackgroundColor(bar());
     topBar->setAlignItems(brls::AlignItems::CENTER);
-    topBar->setPadding(0, 36, 0, 12);
+    topBar->setPadding(0, 36 + sideInset(), 0, 12 + sideInset());
     topBar->addView(new NavIcon(ICON_BACK, back));
     auto* lg = logo();
     lg->setMarginLeft(10);
@@ -195,7 +229,15 @@ brls::Box* page(const std::string& title, brls::View* content, std::function<voi
     root->addView(topBar);
 
     content->setGrow(1);
-    root->addView(content);
+    if (fullBleed || sideInset() <= 0) {
+        root->addView(content);
+    } else {
+        auto* body = new brls::Box(brls::Axis::COLUMN);
+        body->setGrow(1);
+        body->setPadding(0, sideInset(), 0, sideInset());
+        body->addView(content);
+        root->addView(body);
+    }
     root->registerAction(
         "Back", brls::BUTTON_B,
         [back](brls::View*) {
@@ -243,7 +285,7 @@ void CtaButton::setText(const std::string& text) { lbl->setText(text); }
 NavItem::NavItem(const std::string& text, std::function<void()> onClick) : brls::Box(brls::Axis::ROW) {
     setFocusable(true);
     setHideHighlight(true);
-    setHeight(64);
+    setHeight(topBarHeight());
     setPadding(0, 16, 0, 16);
     setAlignItems(brls::AlignItems::CENTER);
     lbl = label(text, 17, nvgRGB(218, 218, 222));
@@ -278,7 +320,7 @@ NavIcon::NavIcon(unsigned cp, std::function<void()> onClick) : brls::Box(brls::A
     setFocusable(true);
     setHideHighlight(true);
     setWidth(56);
-    setHeight(64);
+    setHeight(topBarHeight());
     setJustifyContent(brls::JustifyContent::CENTER);
     setAlignItems(brls::AlignItems::CENTER);
     iconView = new IconView(cp, 28, nvgRGB(218, 218, 222));
@@ -341,7 +383,19 @@ PosterCard::PosterCard(const GridItem& it, float width) : brls::Box(brls::Axis::
     sub->setMarginTop(4);
     addView(sub);
 
-    addGestureRecognizer(new brls::TapGestureRecognizer(this));
+    // tap: the ⋮ on the cover opens the options, anywhere else opens the show
+    addGestureRecognizer(new brls::TapGestureRecognizer([this](brls::TapGestureStatus st, brls::Sound* snd) {
+        if (st.state != brls::GestureState::END) return;
+        *snd = brls::SOUND_CLICK;
+        auto f = getFrame();
+        float cx = f.getMinX() + coverW - 22, cy = f.getMinY() + 22;
+        float dx = st.position.x - cx, dy = st.position.y - cy;
+        brls::Application::giveFocus(this);
+        if (onOptions && dx * dx + dy * dy <= 34 * 34)
+            onOptions();
+        else if (onActivate)
+            onActivate();
+    }));
 }
 
 void PosterCard::draw(NVGcontext* vg, float x, float y, float width, float height, brls::Style style,
@@ -361,6 +415,7 @@ void PosterCard::draw(NVGcontext* vg, float x, float y, float width, float heigh
         nvgTextAlign(vg, NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
         nvgText(vg, bx + w / 2, by + h / 2 + 1, item.badge.c_str(), nullptr);
     }
+    if (onOptions) drawOptionsDots(vg, x + coverW - 22, y + 22, 16, true);
     if (progress >= 0) {
         float p = std::min(1.0f, std::max(0.0f, progress));
         nvgBeginPath(vg);
@@ -409,18 +464,18 @@ PosterRow::PosterRow(const std::string& title, const std::string& subtitle) : br
     setAlignItems(brls::AlignItems::STRETCH);
 
     auto* t = label(title, 25, text(), true);
-    t->setMarginLeft(60);
+    t->setMarginLeft(60 + sideInset());
     addView(t);
     if (!subtitle.empty()) {
         auto* s = label(subtitle, 15, muted());
-        s->setMarginLeft(60);
+        s->setMarginLeft(60 + sideInset());
         s->setMarginTop(4);
         addView(s);
     }
 
     strip = new brls::Box(brls::Axis::ROW);
     strip->setAlignItems(brls::AlignItems::FLEX_START);
-    strip->setPadding(14, 60, 10, 60);
+    strip->setPadding(14, 60 + sideInset(), 10, 60 + sideInset());
 
     scroller = new brls::HScrollingFrame();
     scroller->setHeight(std::round(CARD_W * 1.5f) + 84);
@@ -442,11 +497,18 @@ void PosterRow::setItems(const std::vector<GridItem>& items) {
             if (onSelect) onSelect(card->item);
             return true;
         });
-        if (onOptions)
+        card->onActivate = [this, card] {
+            if (onSelect) onSelect(card->item);
+        };
+        if (onOptions) {
             card->registerAction("Options", brls::BUTTON_START, [this, card](brls::View*) {
                 if (onOptions) onOptions(card->item);
                 return true;
             });
+            card->onOptions = [this, card] {
+                if (onOptions) onOptions(card->item);
+            };
+        }
         strip->addView(card);
         if (!first) first = card;
     }

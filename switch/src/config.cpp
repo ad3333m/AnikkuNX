@@ -11,6 +11,10 @@
 std::string Config::configDir() const {
 #ifdef __SWITCH__
     return "sdmc:/switch/AnikkuNX";
+#elif defined(IOS)
+    // inside the app sandbox; visible in the Files app (UIFileSharingEnabled)
+    const char* home = getenv("HOME");
+    return std::string(home ? home : ".") + "/Documents/AnikkuNX";
 #else
     const char* home = getenv("HOME");
     return std::string(home ? home : ".") + "/.config/AnikkuNX";
