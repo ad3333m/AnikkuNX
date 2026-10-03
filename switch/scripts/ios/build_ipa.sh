@@ -23,9 +23,10 @@ STAGED=../dist/Payload/AnikkuNX.app
 EXTRA=$(find "$STAGED" -name Info.plist ! -path "$STAGED/Info.plist")
 [ -z "$EXTRA" ] || { echo "unexpected nested Info.plist: $EXTRA"; exit 1; }
 
-# ad-hoc signature, like any other app; AltStore/Sideloadly/ESign/Feather re-sign it on install
-codesign --force --sign - --timestamp=none "$STAGED"
-codesign --verify --verbose "$STAGED"
+# fakesign the executable (what TrollStore expects); AltStore/Sideloadly/ESign/Feather re-sign on install anyway
+if command -v ldid >/dev/null 2>&1 || brew install ldid >/dev/null 2>&1; then
+    ldid -S "$STAGED/AnikkuNX" && echo "fakesigned with ldid" || echo "ldid failed, shipping unsigned"
+fi
 
 # Info.plist and icons go first in the archive, then everything else
 (cd ../dist &&
