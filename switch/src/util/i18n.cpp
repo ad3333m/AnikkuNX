@@ -36,19 +36,8 @@ std::string fill(std::string s, const std::string& a) {
 namespace i18n {
 
 void init() {
-    // es. "it", "en-US", "zh-Hans", "pt-BR"
-    std::string locale = brls::Application::getLocale();
-    std::string code = locale.substr(0, locale.find('-'));
-    if (locale.rfind("zh", 0) == 0) code = (locale.find("Hant") != std::string::npos || locale.find("TW") != std::string::npos) ? "zh-Hant" : "zh-Hans";
-    if (code.empty() || code == "it") {
-        lang = "it";
-        return;
-    }
-    if (loadFile(code)) {
-        lang = code;
-    } else if (loadFile("en")) {
-        lang = "en";
-    }
+    // English-only build: ignore the console language
+    if (loadFile("en")) lang = "en";
 }
 
 const std::string& language() { return lang; }

@@ -19,11 +19,12 @@ int main(int argc, char* argv[]) {
         if (std::strcmp(argv[i], "-d") == 0) brls::Logger::setLogLevel(brls::LogLevel::LOG_DEBUG);
     }
 
+    brls::Platform::APP_LOCALE_DEFAULT = "en-US";  // English-only, also for borealis' own hints
     if (!brls::Application::init()) {
         brls::Logger::error("Impossibile inizializzare borealis");
         return EXIT_FAILURE;
     }
-    i18n::init();  // lingua dell'interfaccia = lingua di sistema
+    i18n::init();
 
 
 #ifdef __SWITCH__
@@ -65,13 +66,16 @@ int main(int argc, char* argv[]) {
     brls::Application::getPlatform()->setThemeVariant(brls::ThemeVariant::DARK);
     brls::Application::setGlobalQuit(false);
 
-    // Tema: accento rosa come Anikku
-    brls::Theme::getDarkTheme().addColor("brls/accent", nvgRGB(214, 51, 108));
-    brls::Theme::getDarkTheme().addColor("brls/highlight/color1", nvgRGB(214, 51, 108));
-    brls::Theme::getDarkTheme().addColor("brls/highlight/color2", nvgRGB(255, 120, 170));
-    brls::Theme::getDarkTheme().addColor("brls/button/primary_enabled_background", nvgRGB(214, 51, 108));
-    brls::Theme::getDarkTheme().addColor("brls/sidebar/active_item", nvgRGB(214, 51, 108));
-    brls::Theme::getDarkTheme().addColor("brls/slider/line_filled", nvgRGB(214, 51, 108));
+    // Theme: Crunchyroll-style black background with orange accents
+    auto& theme = brls::Theme::getDarkTheme();
+    theme.addColor("brls/background", nvgRGB(0, 0, 0));
+    theme.addColor("brls/accent", nvgRGB(244, 117, 33));
+    theme.addColor("brls/highlight/color1", nvgRGB(244, 117, 33));
+    theme.addColor("brls/highlight/color2", nvgRGB(255, 190, 130));
+    theme.addColor("brls/button/primary_enabled_background", nvgRGB(244, 117, 33));
+    theme.addColor("brls/button/primary_enabled_text", nvgRGB(0, 0, 0));
+    theme.addColor("brls/sidebar/active_item", nvgRGB(244, 117, 33));
+    theme.addColor("brls/slider/line_filled", nvgRGB(244, 117, 33));
 
     // Barra laterale piu' stretta: lascia spazio alla griglia delle copertine
     brls::getStyle().addMetric("brls/tab_frame/sidebar_width", 300);

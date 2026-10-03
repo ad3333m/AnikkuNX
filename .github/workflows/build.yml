@@ -38,3 +38,24 @@ jobs:
         with:
           files: dist/AnikkuNX.nro
           body_path: notes.md
+
+  preview:
+    runs-on: ubuntu-24.04
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install desktop build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends build-essential cmake pkg-config git \
+            libmpv-dev libcurl4-openssl-dev libglfw3-dev libgl-dev libgl1-mesa-dri xvfb xdotool imagemagick
+
+      - name: Build and screenshot the UI
+        run: bash switch/scripts/preview_desktop.sh
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ui-preview
+          path: preview/

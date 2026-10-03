@@ -76,9 +76,9 @@ void Config::save() {
 
 bool Config::isSourceEnabled(const std::string& id) const {
     if (!sourcesChosen) {
-        // prima della scelta sono attive solo le italiane
+        // before the user picks, only the English sources are on
         auto s = src::byId(id);
-        return s && s->lang() == "it";
+        return s && s->lang() == "en" && !s->nsfw();
     }
     if (!enabledSources.count(id)) return false;
     auto s = src::byId(id);

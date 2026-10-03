@@ -18,7 +18,7 @@
 #define APP_VERSION "0.0.0"
 #endif
 #ifndef UPDATE_REPO
-#define UPDATE_REPO "DiGiTaLAnGeL92/AnikkuNX"
+#define UPDATE_REPO "ad3333m/AnikkuNX"
 #endif
 
 namespace updater {

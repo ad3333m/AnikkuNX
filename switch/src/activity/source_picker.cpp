@@ -109,11 +109,8 @@ brls::View* SourcePickerActivity::createContentView() {
 
 void SourcePickerActivity::rebuild() {
     list->clearViews();
-    // raggruppa per lingua: italiano, lingua della console, inglese, multilingua, poi le altre
-    std::vector<std::string> order = {"it"};
-    std::string ui = i18n::language().substr(0, 2);
-    for (const std::string& l : {ui, std::string("en"), std::string("all")})
-        if (std::find(order.begin(), order.end(), l) == order.end()) order.push_back(l);
+    // English first, then multi-language, then everything else
+    std::vector<std::string> order = {"en", "all"};
     for (auto& s : src::all())
         if (std::find(order.begin(), order.end(), s->lang()) == order.end()) order.push_back(s->lang());
 

@@ -57,7 +57,7 @@ DownloadsTab::DownloadsTab() {
     top->addView(queueButton);
     this->addView(top);
 
-    grid = new AnimeGrid(4, 196);
+    grid = new AnimeGrid(5, 206);
     grid->setGrow(1);
     grid->onSelect = [](const GridItem& it) {
         brls::Application::pushActivity(new DownloadedAnimeActivity(it.sourceId, it.url, it.title, it.thumbnail));
