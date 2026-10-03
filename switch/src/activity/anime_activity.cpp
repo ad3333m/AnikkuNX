@@ -50,6 +50,23 @@ static int lastColumn = 0;  // keeps the column when moving between grid rows
 
 // ----------------------------------------------------------------------------- header
 
+/** Title logo drawn to fit its box, anchored bottom-left (brls::Image sizes itself before the PNG arrives). */
+class LogoImage : public CoverImage {
+  public:
+    LogoImage() { setBackgroundColor(nvgRGBA(0, 0, 0, 0)); }
+    void draw(NVGcontext* vg, float x, float y, float w, float h, brls::Style, brls::FrameContext*) override {
+        int tex = getTexture();
+        float iw = getOriginalImageWidth(), ih = getOriginalImageHeight();
+        if (!tex || iw <= 0 || ih <= 0) return;
+        float s = std::min(w / iw, h / ih);
+        float dw = iw * s, dh = ih * s, ox = x, oy = y + h - dh;
+        nvgBeginPath(vg);
+        nvgRect(vg, ox, oy, dw, dh);
+        nvgFillPaint(vg, nvgImagePattern(vg, ox, oy, dw, dh, 0, tex, 1.0f));
+        nvgFill(vg);
+    }
+};
+
 class SeriesHero : public brls::RecyclerCell {
   public:
     explicit SeriesHero(AnimeActivity* a) : act(a) {
@@ -68,11 +85,8 @@ class SeriesHero : public brls::RecyclerCell {
         titleBox->setHeight(140);
         titleBox->setJustifyContent(brls::JustifyContent::FLEX_END);
         titleBox->setAlignItems(brls::AlignItems::FLEX_START);
-        logo = new CoverImage();
-        logo->setScalingType(brls::ImageScalingType::FIT);
-        logo->setImageAlign(brls::ImageAlignment::LEFT);
-        logo->setBackgroundColor(nvgRGBA(0, 0, 0, 0));
-        logo->setWidth(480);
+        logo = new LogoImage();
+        logo->setWidth(500);
         logo->setHeight(136);
         logo->setVisibility(brls::Visibility::GONE);
         titleBox->addView(logo);
