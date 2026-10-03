@@ -52,6 +52,21 @@ jobs:
           name: AnikkuNX-ipa
           path: dist/AnikkuNX.ipa
 
+  ios-simulator:
+    runs-on: macos-15
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run in the iOS Simulator
+        run: bash switch/scripts/ios/simulator_test.sh
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ios-simulator-preview
+          path: sim-preview/
+
   preview:
     runs-on: ubuntu-24.04
     continue-on-error: true

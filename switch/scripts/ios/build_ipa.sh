@@ -23,15 +23,13 @@ STAGED=../dist/Payload/AnikkuNX.app
 EXTRA=$(find "$STAGED" -name Info.plist ! -path "$STAGED/Info.plist")
 [ -z "$EXTRA" ] || { echo "unexpected nested Info.plist: $EXTRA"; exit 1; }
 
-# fakesign the executable (what TrollStore expects); AltStore/Sideloadly/ESign/Feather re-sign on install anyway
-if command -v ldid >/dev/null 2>&1 || brew install ldid >/dev/null 2>&1; then
-    ldid -S "$STAGED/AnikkuNX" && echo "fakesigned with ldid" || echo "ldid failed, shipping unsigned"
-fi
+# left unsigned with no signing data (like IPAs published for KravaSigner/ESign): the signer adds its own
+rm -rf "$STAGED/_CodeSignature" "$STAGED/embedded.mobileprovision"
 
-# Info.plist and icons go first in the archive, then everything else
+# files only (no directory entries), Info.plist and icons first
 (cd ../dist &&
-    zip -q AnikkuNX.ipa Payload/ Payload/AnikkuNX.app/ Payload/AnikkuNX.app/Info.plist Payload/AnikkuNX.app/AppIcon*.png &&
-    zip -qr AnikkuNX.ipa Payload &&
+    zip -qD AnikkuNX.ipa Payload/AnikkuNX.app/Info.plist Payload/AnikkuNX.app/AppIcon*.png &&
+    zip -qrD AnikkuNX.ipa Payload &&
     rm -rf Payload)
 unzip -l ../dist/AnikkuNX.ipa | head -8
 ls -la ../dist

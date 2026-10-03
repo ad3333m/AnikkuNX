@@ -2,8 +2,9 @@
 # Downloads prebuilt iOS (arm64 device) static libraries into switch/library/ios-deps:
 #   - libmpv, FFmpeg and their dependencies from MPVKit (LGPL build)
 #   - libcurl + nghttp2 from Build-OpenSSL-cURL (OpenSSL itself comes from MPVKit, to avoid duplicates)
-# Run on macOS (needs lipo).
+# Run on macOS (needs lipo). Pass "simulator" to get the arm64 iOS Simulator slices instead.
 set -euo pipefail
+SLICE="${1:-device}"
 cd "$(dirname "$0")/../.."
 ROOT="$(pwd)"
 OUT="$ROOT/library/ios-deps"
@@ -19,7 +20,11 @@ cd "$WORK"
 take() {
     local xc="$1" name slice bin
     name=$(basename "$xc" .xcframework)
-    slice=$(find "$xc" -mindepth 1 -maxdepth 1 -type d -name 'ios-arm64*' ! -name '*simulator*' ! -name '*maccatalyst*' | head -1)
+    if [ "$SLICE" = simulator ]; then
+        slice=$(find "$xc" -mindepth 1 -maxdepth 1 -type d -name 'ios-*simulator*' | head -1)
+    else
+        slice=$(find "$xc" -mindepth 1 -maxdepth 1 -type d -name 'ios-arm64*' ! -name '*simulator*' ! -name '*maccatalyst*' | head -1)
+    fi
     if [ -z "$slice" ]; then
         echo "!! no ios-arm64 slice in $xc"; ls "$xc"; return 1
     fi
@@ -47,7 +52,7 @@ while read -r url; do
     unzip -q -o "$f" -d mpvkit
 done < urls.txt
 for xc in mpvkit/*.xcframework; do take "$xc"; done
-cp -R "mpvkit/Libmpv.xcframework/ios-arm64/Libmpv.framework/Headers/." "$OUT/include/"
+cp -R "$(find mpvkit/Libmpv.xcframework -path '*ios-arm64/Libmpv.framework/Headers' | head -1)/." "$OUT/include/"
 
 echo "== libcurl"
 curl -fsSL --retry 4 --retry-delay 5 "$CURL_TGZ" -o curl.tgz
@@ -58,7 +63,11 @@ for lib in libcurl libnghttp2; do
     if [ -n "$xc" ]; then
         take "$xc"
     else
-        fat=$(find curlpkg -name "${lib}_iOS.a" -o -name "${lib}-iOS.a" | head -1)
+        if [ "$SLICE" = simulator ]; then
+            fat=$(find curlpkg -iname "${lib}*sim*.a" | head -1)
+        else
+            fat=$(find curlpkg -name "${lib}_iOS.a" -o -name "${lib}-iOS.a" | head -1)
+        fi
         [ -n "$fat" ] || { echo "!! $lib not found"; find curlpkg -name '*.a' | head -40; exit 1; }
         lipo "$fat" -thin arm64 -output "$OUT/lib/$lib.a"
         echo "  $lib <- $fat"
