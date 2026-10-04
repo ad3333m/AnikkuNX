@@ -32,16 +32,24 @@ run_on() {
     mkdir -p "$data/Documents/AnikkuNX"
     echo '{"sourcesChosen": true, "checkUpdates": false, "checkNewEpisodes": false, "enabledSources": ["en.anichi", "en.anikoto", "en.aniwave", "en.animesogo", "en.kickassanime", "en.wcofun"]}' \
         > "$data/Documents/AnikkuNX/config.json"
-    xcrun simctl launch --console-pty --terminate-running-process "$id" "$BUNDLE" > "$OUT/$tag-console.txt" 2>&1 &
-    sleep 60
+    xcrun simctl launch --stdout="$OUT/$tag-stdout.txt" --stderr="$OUT/$tag-stderr.txt" "$id" "$BUNDLE" \
+        > "$OUT/$tag-launch.txt" 2>&1
+    cat "$OUT/$tag-launch.txt"
+    sleep 8
+    xcrun simctl io "$id" screenshot "$OUT/$tag-0-start.png"
+    xcrun simctl spawn "$id" launchctl list 2>/dev/null | grep -i anikku > "$OUT/$tag-running-8s.txt"
+    sleep 50
     xcrun simctl io "$id" screenshot "$OUT/$tag-1-home.png"
     sleep 20
     xcrun simctl io "$id" screenshot "$OUT/$tag-2-later.png"
-    xcrun simctl spawn "$id" launchctl list 2>/dev/null | grep -i anikku > "$OUT/$tag-running.txt"
+    xcrun simctl spawn "$id" launchctl list 2>/dev/null | grep -i anikku > "$OUT/$tag-running-80s.txt"
+    xcrun simctl spawn "$id" log show --last 5m --style compact \
+        --predicate 'process == "AnikkuNX" OR eventMessage CONTAINS[c] "anikkunx"' > "$OUT/$tag-syslog.txt" 2>&1
+    find ~/Library/Logs/DiagnosticReports -iname "*AnikkuNX*" -exec cp {} "$OUT/" \; 2>/dev/null
     xcrun simctl shutdown "$id"
 }
-run_on phone "iPhone 16 Pro Max"
-run_on ipad "iPad Pro 13-inch (M4)"
-cp ~/Library/Logs/DiagnosticReports/*AnikkuNX* "$OUT/" 2>/dev/null
+run_on phone "iPhone 17 Pro Max"
+run_on ipad "iPad Pro (12.9-inch) (5th generation)"
+find ~/Library/Logs/DiagnosticReports -iname "*AnikkuNX*" -exec cp {} "$OUT/" \; 2>/dev/null
 ls -la "$OUT"
 exit 0
