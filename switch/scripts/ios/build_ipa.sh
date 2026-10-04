@@ -26,10 +26,24 @@ EXTRA=$(find "$STAGED" -name Info.plist ! -path "$STAGED/Info.plist")
 # left unsigned with no signing data (like IPAs published for KravaSigner/ESign): the signer adds its own
 rm -rf "$STAGED/_CodeSignature" "$STAGED/embedded.mobileprovision"
 
-# files only (no directory entries), Info.plist and icons first
-(cd ../dist &&
-    zip -qD AnikkuNX.ipa Payload/AnikkuNX.app/Info.plist Payload/AnikkuNX.app/AppIcon*.png &&
-    zip -qrD AnikkuNX.ipa Payload &&
-    rm -rf Payload)
+# Plain zip: file entries only and no "extra fields". Info-ZIP's timestamp extras differ in length
+# between local and central headers, and KravaSigner's unzipper then reads Info.plist as garbage
+# ("Unknown", no icon).
+(cd ../dist && python3 - <<'PY'
+import os, time, zipfile
+stamp = time.localtime()[:6]
+with zipfile.ZipFile("AnikkuNX.ipa", "w", zipfile.ZIP_DEFLATED, compresslevel=6) as out:
+    files = []
+    for root, _, names in os.walk("Payload"):
+        files += [os.path.join(root, n) for n in names]
+    for path in sorted(files):
+        info = zipfile.ZipInfo(path.replace(os.sep, "/"), date_time=stamp)
+        info.create_system = 3
+        info.compress_type = zipfile.ZIP_DEFLATED
+        info.external_attr = (0o100755 if os.access(path, os.X_OK) else 0o100644) << 16
+        with open(path, "rb") as f:
+            out.writestr(info, f.read())
+PY
+rm -rf Payload)
 unzip -l ../dist/AnikkuNX.ipa | head -8
 ls -la ../dist

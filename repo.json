@@ -6,7 +6,9 @@
   "website": "https://github.com/ad3333m/AnikkuNX",
   "sourceURL": "https://raw.githubusercontent.com/ad3333m/AnikkuNX/netflix-ui/repo.json",
   "tintColor": "F47521",
-  "featuredApps": ["com.ad3333m.anikkunx"],
+  "featuredApps": [
+    "com.ad3333m.anikkunx"
+  ],
   "apps": [
     {
       "name": "AnikkuNX",
@@ -16,11 +18,11 @@
       "version": "0.6.2",
       "buildVersion": "1",
       "versionDate": "2026-10-04",
-      "downloadURL": "https://github.com/ad3333m/AnikkuNX/releases/download/ios-0.6.2/AnikkuNX.ipa",
+      "downloadURL": "https://github.com/ad3333m/AnikkuNX/releases/download/ios-0.6.2/AnikkuNX-0.6.2.ipa",
       "localizedDescription": "Browse and stream anime from English sources with a Crunchyroll-style home, series pages with episode stills, My List, history and offline downloads. Landscape, iPhone and iPad (iOS 15+).",
       "iconURL": "https://raw.githubusercontent.com/ad3333m/AnikkuNX/netflix-ui/icons/anikkunx.png",
       "tintColor": "F47521",
-      "size": 21657571,
+      "size": 21622093,
       "screenshotURLs": []
     }
   ],
