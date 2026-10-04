@@ -23,6 +23,22 @@ STAGED=../dist/Payload/AnikkuNX.app
 EXTRA=$(find "$STAGED" -name Info.plist ! -path "$STAGED/Info.plist")
 [ -z "$EXTRA" ] || { echo "unexpected nested Info.plist: $EXTRA"; exit 1; }
 
+# Read the bundle the way on-device signers do (Feather/KravaSigner: Bundle(url:)). A root folder named
+# Resources/Contents/Support Files (any case) turns it into an old-style bundle and hides Info.plist.
+cat > "${RUNNER_TEMP:-/tmp}/bundlecheck.swift" <<'SWIFT'
+import Foundation
+let b = Bundle(url: URL(fileURLWithPath: CommandLine.arguments[1]))
+let name = b?.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String ?? "nil"
+let version = b?.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "nil"
+print("Bundle(url:) reads: name=\(name) version=\(version)")
+exit(name == "nil" || version == "nil" ? 1 : 0)
+SWIFT
+swift "${RUNNER_TEMP:-/tmp}/bundlecheck.swift" "$STAGED"
+PROBE="${RUNNER_TEMP:-/tmp}/probe.app"
+rm -rf "$PROBE" && cp -R "$STAGED" "$PROBE" && mkdir -p "$PROBE/resources"
+swift "${RUNNER_TEMP:-/tmp}/bundlecheck.swift" "$PROBE" || echo "(with a root 'resources' folder CFBundle cannot read the app: that was the Unknown bug)"
+rm -rf "$PROBE"
+
 # left unsigned with no signing data (like IPAs published for KravaSigner/ESign): the signer adds its own
 rm -rf "$STAGED/_CodeSignature" "$STAGED/embedded.mobileprovision"
 

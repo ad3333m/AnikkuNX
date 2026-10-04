@@ -21,12 +21,13 @@
 #include "view/cover_image.hpp"
 
 #ifdef IOS
-/** Resources are copied into <App>.app/resources; borealis and the app open them relative to the cwd. */
+/** Resources are copied into <App>.app/assets (a root folder named "Resources" in any case makes CFBundle
+ *  treat the app as an old-style bundle and miss Info.plist); borealis and the app open them relative to the cwd. */
 static void enterBundleResources() {
     CFURLRef url = CFBundleCopyResourcesDirectoryURL(CFBundleGetMainBundle());
     char path[4096];
     if (url && CFURLGetFileSystemRepresentation(url, true, (UInt8*)path, sizeof(path)))
-        chdir((std::string(path) + "/resources").c_str());
+        chdir((std::string(path) + "/assets").c_str());
     if (url) CFRelease(url);
 }
 #endif
