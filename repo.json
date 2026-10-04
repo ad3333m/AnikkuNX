@@ -7,10 +7,26 @@
   "sourceURL": "https://raw.githubusercontent.com/ad3333m/AnikkuNX/netflix-ui/repo.json",
   "tintColor": "F47521",
   "featuredApps": [
+    "com.ad3333m.ciname",
     "com.ad3333m.anikku",
     "com.ad3333m.anikkunx"
   ],
   "apps": [
+    {
+      "name": "Ciname",
+      "bundleIdentifier": "com.ad3333m.ciname",
+      "developerName": "ad3333m",
+      "subtitle": "AnikkuNX and Cinejoy in one app",
+      "version": "1.0.0",
+      "buildVersion": "1",
+      "versionDate": "2026-10-04",
+      "downloadURL": "https://github.com/ad3333m/anikku/releases/download/ciname-v1.0.0/Ciname.ipa",
+      "localizedDescription": "Opens on a picker: AnikkuNX for anime, Cinejoy for movies and TV. Each keeps your place; swipe in from the left edge to get back to the picker. Pop-ups and ad domains are blocked. iPhone and iPad, iOS 15+.",
+      "iconURL": "https://raw.githubusercontent.com/ad3333m/anikku/main/ciname/Assets.xcassets/AppIcon.appiconset/icon-1024.png",
+      "tintColor": "FF9A2E",
+      "size": 449713,
+      "screenshotURLs": []
+    },
     {
       "name": "Anikku",
       "bundleIdentifier": "com.ad3333m.anikku",
