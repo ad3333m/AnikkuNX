@@ -17,14 +17,14 @@
       "bundleIdentifier": "com.ad3333m.ciname",
       "developerName": "ad3333m",
       "subtitle": "Anikku and Cinejoy in one app",
-      "version": "1.0.2",
-      "buildVersion": "3",
+      "version": "1.0.3",
+      "buildVersion": "4",
       "versionDate": "2026-10-04",
-      "downloadURL": "https://github.com/ad3333m/anikku/releases/download/ciname-v1.0.2/Ciname.ipa",
+      "downloadURL": "https://github.com/ad3333m/anikku/releases/download/ciname-v1.0.3/Ciname.ipa",
       "localizedDescription": "Opens on a picker: Anikku for anime, Cinejoy for movies and TV. Each keeps your place; the back button on either app's Home, or a swipe in from the left edge, returns to the picker. Pop-ups and ad domains are blocked. iPhone and iPad, iOS 15+.",
       "iconURL": "https://raw.githubusercontent.com/ad3333m/anikku/main/ciname/Assets.xcassets/AppIcon.appiconset/icon-1024.png",
       "tintColor": "FF9A2E",
-      "size": 454191,
+      "size": 454411,
       "screenshotURLs": []
     },
     {
