@@ -7,9 +7,25 @@
   "sourceURL": "https://raw.githubusercontent.com/ad3333m/AnikkuNX/netflix-ui/repo.json",
   "tintColor": "F47521",
   "featuredApps": [
+    "com.ad3333m.anikku",
     "com.ad3333m.anikkunx"
   ],
   "apps": [
+    {
+      "name": "Anikku",
+      "bundleIdentifier": "com.ad3333m.anikku",
+      "developerName": "ad3333m",
+      "subtitle": "Anime with a slick, ad-free player",
+      "version": "1.0.0",
+      "buildVersion": "1",
+      "versionDate": "2026-10-04",
+      "downloadURL": "https://github.com/ad3333m/anikku/releases/download/v1.0.0/Anikku.ipa",
+      "localizedDescription": "Crunchyroll-style anime app: trending and seasonal rows, series pages with episode stills, My List, history and a weekly schedule. Anikku's own player controls with skip intro/outro and autoplay; pop-ups, new tabs and ad scripts are blocked. iPhone and iPad, iOS 15+.",
+      "iconURL": "https://raw.githubusercontent.com/ad3333m/anikku/main/docs/img/icon-512.png",
+      "tintColor": "F47521",
+      "size": 145632,
+      "screenshotURLs": []
+    },
     {
       "name": "AnikkuNX",
       "bundleIdentifier": "com.ad3333m.anikkunx",
