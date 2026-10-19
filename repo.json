@@ -7,11 +7,33 @@
   "sourceURL": "https://raw.githubusercontent.com/ad3333m/AnikkuNX/netflix-ui/repo.json",
   "tintColor": "F47521",
   "featuredApps": [
+    "com.ad3333m.braviaremote",
     "com.ad3333m.ciname",
     "com.ad3333m.anikku",
     "com.ad3333m.anikkunx"
   ],
   "apps": [
+    {
+      "name": "BraviaRemote",
+      "bundleIdentifier": "com.ad3333m.braviaremote",
+      "developerName": "ad3333m",
+      "subtitle": "Glassy remote for Sony BRAVIA TVs",
+      "version": "1.2.0",
+      "buildVersion": "3",
+      "versionDate": "2026-10-19",
+      "downloadURL": "https://github.com/ad3333m/braviaremote/releases/download/v1.2.0/BraviaRemote.ipa",
+      "localizedDescription": "Control your BRAVIA over Wi-Fi. Inputs opens a list of your HDMI ports and switches with one tap; Apps shows every app on the TV with its real icon and opens it with one tap. Pin favourite apps to the home screen, ask the Assistant by voice (your iPhone turns it into a TV search), and use the d-pad, media keys, volume and typing. Needs IP control with a Pre-Shared Key turned on in the TV's network settings. iPhone and iPad, iOS 16+.",
+      "iconURL": "https://raw.githubusercontent.com/ad3333m/braviaremote/main/ios/Assets.xcassets/AppIcon.appiconset/icon-1024.png",
+      "tintColor": "8E9AAF",
+      "size": 542867,
+      "screenshotURLs": [
+        "https://github.com/ad3333m/braviaremote/releases/download/v1.2.0/BraviaRemote-remote.png",
+        "https://github.com/ad3333m/braviaremote/releases/download/v1.2.0/BraviaRemote-apps.png",
+        "https://github.com/ad3333m/braviaremote/releases/download/v1.2.0/BraviaRemote-inputs.png",
+        "https://github.com/ad3333m/braviaremote/releases/download/v1.2.0/BraviaRemote-assistant.png",
+        "https://github.com/ad3333m/braviaremote/releases/download/v1.2.0/BraviaRemote-settings.png"
+      ]
+    },
     {
       "name": "Ciname",
       "bundleIdentifier": "com.ad3333m.ciname",
